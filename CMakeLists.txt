@@ -43,11 +43,12 @@ set(target beatrice_${full_version_str})
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/MT>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/MT>")
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    
 
 set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES 0)
 set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES 0)
 set(SMTG_ENABLE_VSTGUI_SUPPORT 1)
+set(SMTG_USE_STATIC_CRT 1)
 
 set(vst3sdk_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/vst3sdk)
 
