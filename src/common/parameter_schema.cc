@@ -59,7 +59,7 @@ const ParameterSchema kSchema = ParameterSchema({
                         model_config.voices[0].average_pitch;
                     switch (std::get<int>(
                         controller.parameter_state_.GetValue(1, 9))) {
-                      case 0: {  // AverageSourcePitch 固定
+                      case 0: {  // AvgSrcPitch 固定
                         // ピッチシフト量を変更する
                         const auto average_source_pitch = std::get<double>(
                             controller.parameter_state_.GetValue(1, 8));
@@ -70,7 +70,7 @@ const ParameterSchema kSchema = ParameterSchema({
                         controller.updated_parameters_.emplace_back(1, 7);
                       } break;
                       case 1: {  // PitchShift 固定
-                        // AverageSourcePitch を変更する
+                        // AvgSrcPitch を変更する
                         const auto pitch_shift = std::get<double>(
                             controller.parameter_state_.GetValue(1, 7));
                         // clamp するべき？
@@ -116,7 +116,7 @@ const ParameterSchema kSchema = ParameterSchema({
                            controller.parameter_state_.GetValue(100, value));
                        switch (std::get<int>(
                            controller.parameter_state_.GetValue(1, 9))) {
-                         case 0: {  // AverageSourcePitch 固定
+                         case 0: {  // AvgSrcPitch 固定
                            // ピッチシフト量を変更する
                            const auto average_source_pitch = std::get<double>(
                                controller.parameter_state_.GetValue(1, 8));
@@ -128,7 +128,7 @@ const ParameterSchema kSchema = ParameterSchema({
                            controller.updated_parameters_.emplace_back(1, 7);
                          } break;
                          case 1: {  // PitchShift 固定
-                           // AverageSourcePitch を変更する
+                           // AvgSrcPitch を変更する
                            const auto pitch_shift = std::get<double>(
                                controller.parameter_state_.GetValue(1, 7));
                            // clamp するべき？
@@ -158,7 +158,7 @@ const ParameterSchema kSchema = ParameterSchema({
                                100, target_speaker));
                        switch (std::get<int>(
                            controller.parameter_state_.GetValue(1, 9))) {
-                         case 0: {  // AverageSourcePitch 固定
+                         case 0: {  // AvgSrcPitch 固定
                            // ピッチシフト量を変更する
                            const auto average_source_pitch = std::get<double>(
                                controller.parameter_state_.GetValue(1, 8));
@@ -170,7 +170,7 @@ const ParameterSchema kSchema = ParameterSchema({
                            controller.updated_parameters_.emplace_back(1, 7);
                          } break;
                          case 1: {
-                           // AverageSourcePitch を変更する
+                           // AvgSrcPitch を変更する
                            const auto pitch_shift = std::get<double>(
                                controller.parameter_state_.GetValue(1, 7));
                            // clamp するべき？
@@ -192,7 +192,7 @@ const ParameterSchema kSchema = ParameterSchema({
                      kMaxAbsPitchShift, u8"semitones"s, 48 * 8, u8"Pit"s,
                      parameter_flag::kCanAutomate,
                      [](ControllerCore& controller, const double value) {
-                       // AverageSourcePitch を変更する
+                       // AvgSrcPitch を変更する
                        const auto target_speaker = std::get<int>(
                            controller.parameter_state_.GetValue(1, 0));
                        const auto formant_shift = std::get<double>(
@@ -212,7 +212,7 @@ const ParameterSchema kSchema = ParameterSchema({
                        return vc.GetCore()->SetPitchShift(value);
                      })},
              {8, NumberParameter(
-                     u8"AverageSourcePitch"s, 52.0, 0.0, 128.0, u8""s, 128 * 8,
+                     u8"AvgSrcPitch"s, 52.0, 0.0, 128.0, u8""s, 128 * 8,
                      u8"SrcPit"s, parameter_flag::kNoFlags,
                      [](ControllerCore& controller, const double value) {
                        // PitchShift を変更する
@@ -232,7 +232,7 @@ const ParameterSchema kSchema = ParameterSchema({
                      },
                      [](ProcessorProxy&, double) { return 0; })},
              {9, ListParameter(
-                     u8"Lock"s, {u8"AverageSourcePitch"s, u8"PitchShift"s}, 0,
+                     u8"Lock"s, {u8"AvgSrcPitch"s, u8"PitchShift"s}, 0,
                      u8"Loc"s, parameter_flag::kIsList,
                      [](ControllerCore&, int) { return 0; },
                      [](ProcessorProxy&, int) { return 0; })},

@@ -95,18 +95,18 @@ auto PLUGIN_API Editor::open(void* const parent,
   frame->addView(footer);
 
   auto context = Context();  // オフセット設定
-  BeginColumn(context, 399, kDarkColorScheme.surface_1);
+  BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_1);
   BeginGroup(context, u8"General");
   MakeSlider(context, 2000, 1);  // Gain
   MakeSlider(context, 2001, 1);  // Gain
   MakeSlider(context, 1007, 2);  // PitchShift
-  MakeSlider(context, 1008, 2);  // AverageSourcePitch
+  MakeSlider(context, 1008, 2);  // AvgSrcPitch
   MakeCombobox(context, 1009, kTransparentCColor,
                kDarkColorScheme.on_surface);  // Lock
   EndGroup(context);
   EndColumn(context);
 
-  BeginColumn(context, 399, kDarkColorScheme.surface_2);
+  BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_2);
   BeginGroup(context, u8"Model");
   MakeFileSelector(context, 1);  // Model
   MakeCombobox(context, 1000, kDarkColorScheme.primary,
@@ -116,7 +116,7 @@ auto PLUGIN_API Editor::open(void* const parent,
   EndGroup(context);
   EndColumn(context);
 
-  BeginColumn(context, 480, kDarkColorScheme.surface_3);
+  BeginColumn(context, kPortraitWidth, kDarkColorScheme.surface_3);
   MakePortraitView(context);
   MakePortraitDescription(context);
 
@@ -455,10 +455,25 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
                          kDarkColorScheme.secondary_dim, kTransparentCColor);
 
   context.y += std::max(context.last_element_mergin, kElementMerginY);
+
+  // 名前
+  const auto title_pos = CRect(0, 0, kLabelWidth, kElementHeight)
+                             .offset(context.x, context.y);
+  const auto title_string =
+      VST3::StringConvert::convert(param->getInfo().title);
+  auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
+                                             nullptr, CParamDisplay::kNoFrame);
+  title_control->setBackColor(kTransparentCColor);
+  title_control->setFont(font_);
+  title_control->setFontColor(kDarkColorScheme.on_surface);
+  title_control->setHoriAlign(CHoriTxtAlign::kCenterText);
+  context.column_elements.push_back(title_control);
+
+  const auto slider_offset_x = context.x + kLabelWidth + kElementMerginX;
   auto* const slider_control = new Slider(
-      CRect(0, 0, kElementWidth, kElementHeight).offset(context.x, context.y),
-      this, static_cast<int>(param_id), context.x,
-      context.x + kElementWidth - kHandleWidth, handle_bmp, slider_bmp,
+      CRect(0, 0, kElementWidth, kElementHeight).offset( slider_offset_x, context.y),
+      this, static_cast<int>(param_id), slider_offset_x,
+      slider_offset_x + kElementWidth - kHandleWidth, handle_bmp, slider_bmp,
       VST3::StringConvert::convert(param->getInfo().units), font_, precision);
   slider_control->setValueNormalized(
       static_cast<float>(param->getNormalized()));
@@ -467,20 +482,6 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
   handle_bmp->forget();
 
   controls_.insert({param_id, slider_control});
-
-  // 名前
-  const auto title_pos = CRect(0, 0, kElementWidth, kElementHeight)
-                             .offset(context.x + kElementWidth + 8, context.y);
-  const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
-  auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
-                                             nullptr, CParamDisplay::kNoFrame);
-  title_control->setBackColor(kTransparentCColor);
-  title_control->setFont(font_);
-  title_control->setFontColor(kDarkColorScheme.on_surface);
-  title_control->setHoriAlign(CHoriTxtAlign::kLeftText);
-  context.column_elements.push_back(title_control);
-
   context.y += kElementHeight;
   context.last_element_mergin = kElementMerginY;
 
@@ -499,8 +500,24 @@ auto Editor::MakeCombobox(
   auto* const bmp = new MonotoneBitmap(kElementWidth, kElementHeight,
                                        back_color, kDarkColorScheme.outline);
   context.y += std::max(context.last_element_mergin, kElementMerginY);
+
+
+  // 名前
+  const auto title_pos = CRect(0, 0, kLabelWidth, kElementHeight)
+                             .offset(context.x, context.y);
+  const auto title_string =
+      VST3::StringConvert::convert(param->getInfo().title);
+  auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
+                                             nullptr, CParamDisplay::kNoFrame);
+  title_control->setBackColor(kTransparentCColor);
+  title_control->setFont(font_);
+  title_control->setFontColor(kDarkColorScheme.on_surface);
+  title_control->setHoriAlign(CHoriTxtAlign::kCenterText);
+  context.column_elements.push_back(title_control);
+
+
   const auto pos =
-      CRect(0, 0, kElementWidth, kElementHeight).offset(context.x, context.y);
+      CRect(0, 0, kElementWidth, kElementHeight).offset(context.x + kLabelWidth + kElementMerginX, context.y);
   auto* const control =
       new COptionMenu(pos, this, static_cast<int>(param_id), bmp);
   bmp->forget();
@@ -518,10 +535,10 @@ auto Editor::MakeCombobox(
   controls_.insert({param_id, control});
 
   // ▼ 記号
-  // TODO(bug): クリックの判定吸われるのをなんとかする
+  // TODO(bug): クリックの判定吸われるのをなんとかする -> setMouseEnabled(false) で解決
   const auto arrow_pos =
       CRect(0, 0, kElementHeight, kElementHeight)
-          .offset(context.x + (kElementWidth - kElementHeight), context.y)
+          .offset(context.x + kLabelWidth + kElementMerginX + (kElementWidth - kElementHeight), context.y)
           .inset(8, 8);
   auto* const arrow_control =
       new CTextLabel(arrow_pos, reinterpret_cast<const char*>(u8"▼"), nullptr,
@@ -533,20 +550,8 @@ auto Editor::MakeCombobox(
   arrow_font->forget();
   arrow_control->setFontColor(font_color);
   arrow_control->setHoriAlign(CHoriTxtAlign::kCenterText);
+  arrow_control->setMouseEnabled(false);
   context.column_elements.push_back(arrow_control);
-
-  // 名前
-  const auto title_pos = CRect(0, 0, kElementWidth, kElementHeight)
-                             .offset(context.x + kElementWidth + 8, context.y);
-  const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
-  auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
-                                             nullptr, CParamDisplay::kNoFrame);
-  title_control->setBackColor(kTransparentCColor);
-  title_control->setFont(font_);
-  title_control->setFontColor(kDarkColorScheme.on_surface);
-  title_control->setHoriAlign(CHoriTxtAlign::kLeftText);
-  context.column_elements.push_back(title_control);
 
   context.y += kElementHeight;
   context.last_element_mergin = kElementMerginY;
@@ -572,8 +577,21 @@ auto Editor::MakeFileSelector(Context& context,
       new MonotoneBitmap(kElementWidth, kElementHeight, kTransparentCColor,
                          kDarkColorScheme.outline);
   context.y += std::max(context.last_element_mergin, kElementMerginY);
+
+  // 名前
+  const auto title_pos = CRect(0, 0, kLabelWidth, kElementHeight)
+                             .offset(context.x, context.y);
+  auto* const title_control = new CTextLabel(
+      title_pos, reinterpret_cast<const char*>(param.GetName().c_str()),
+      nullptr, CParamDisplay::kNoFrame);
+  title_control->setBackColor(kTransparentCColor);
+  title_control->setFont(font_);
+  title_control->setFontColor(kDarkColorScheme.on_surface);
+  title_control->setHoriAlign(CHoriTxtAlign::kCenterText);
+  context.column_elements.push_back(title_control);
+
   const auto pos =
-      CRect(0, 0, kElementWidth, kElementHeight).offset(context.x, context.y);
+      CRect(0, 0, kElementWidth, kElementHeight).offset(context.x + kLabelWidth + kElementMerginX, context.y);
   auto* const control =
       new FileSelector(pos, this, static_cast<int>(vst_param_id), bmp);
   bmp->forget();
@@ -587,17 +605,6 @@ auto Editor::MakeFileSelector(Context& context,
   context.column_elements.push_back(control);
   controls_.insert({vst_param_id, control});
 
-  // 名前
-  const auto title_pos = CRect(0, 0, kElementWidth, kElementHeight)
-                             .offset(context.x + kElementWidth + 8, context.y);
-  auto* const title_control = new CTextLabel(
-      title_pos, reinterpret_cast<const char*>(param.GetName().c_str()),
-      nullptr, CParamDisplay::kNoFrame);
-  title_control->setBackColor(kTransparentCColor);
-  title_control->setFont(font_);
-  title_control->setFontColor(kDarkColorScheme.on_surface);
-  title_control->setHoriAlign(CHoriTxtAlign::kLeftText);
-  context.column_elements.push_back(title_control);
 
   context.y += kElementHeight;
   context.last_element_mergin = kElementMerginY;
@@ -606,10 +613,9 @@ auto Editor::MakeFileSelector(Context& context,
 }
 
 auto Editor::MakePortraitView(Context& context) -> CView* {
-  constexpr auto kSiz = 480;
-  portrait_view_ = new CView(CRect(0, 0, kSiz, kSiz));
+  portrait_view_ = new CView(CRect(0, 0, kPortraitWidth, kPortraitHeight));
   context.column_elements.push_back(portrait_view_);
-  context.y += kSiz;
+  context.y += kPortraitHeight;
   context.last_element_mergin = kElementMerginY;
   return portrait_view_;
 }
