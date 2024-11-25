@@ -41,8 +41,7 @@ Editor::Editor(void* const controller)
     : VSTGUIEditor(controller),
       font_(new CFontDesc(kNormalFont->getName(), 14)),
       font_bold_(new CFontDesc(kNormalFont->getName(), 14, kBoldFace)),
-      portrait_view_(),
-      portrait_description_() {
+      portrait_view_() {
   setRect(ViewRect(0, 0, kWindowWidth, kWindowHeight));
 }
 
@@ -96,7 +95,7 @@ auto PLUGIN_API Editor::open(void* const parent,
 
   auto context = Context();  // オフセット設定
   BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_1);
-  BeginGroup(context, u8"General");
+  BeginGroup(context, u8"General Control");
   MakeSlider(context, 2000, 1);  // Gain
   MakeSlider(context, 2001, 1);  // Gain
   MakeSlider(context, 1007, 2);  // PitchShift
@@ -107,19 +106,19 @@ auto PLUGIN_API Editor::open(void* const parent,
   EndColumn(context);
 
   BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_2);
-  BeginGroup(context, u8"Model");
+  BeginGroup(context, u8"Model Control");
   MakeFileSelector(context, 1);  // Model
   MakeCombobox(context, 1000, kDarkColorScheme.primary,
                kDarkColorScheme.on_primary);  // Voice
   MakeSlider(context, 1006, 2);               // Formant
-  MakeModelVoiceDescription(context);
   EndGroup(context);
   EndColumn(context);
 
-  BeginColumn(context, kPortraitWidth, kDarkColorScheme.surface_3);
+  BeginColumn(context, kModelInfoColumnWidth, kDarkColorScheme.surface_3);
+  BeginGroup(context, u8"Model Info");
   MakePortraitView(context);
-  MakePortraitDescription(context);
-
+  MakeModelVoiceDescription(context);
+  EndGroup(context);
   EndColumn(context);
 
   // 1 要素 1 クラスの方が良かったのか？？？
@@ -141,7 +140,6 @@ void PLUGIN_API Editor::close() {
     frame = nullptr;
     portraits_.clear();
     portrait_view_ = nullptr;
-    portrait_description_ = nullptr;
   }
 }
 
@@ -165,10 +163,12 @@ void Editor::SyncValue(const ParamID param_id,
     control->setValue(static_cast<float>(voice_id));
     portrait_view_->setBackground(
         portraits_.at(model_config_->voices[voice_id].portrait.path).get());
-    portrait_description_->setText(reinterpret_cast<const char*>(
-        model_config_->voices[voice_id].portrait.description.c_str()));
+    model_voice_description_.SetPortraitDescription(
+        model_config_->voices[voice_id].portrait.description);
     model_voice_description_.SetVoiceDescription(
         model_config_->voices[voice_id].description);
+    model_voice_description_.SetPortraitDescription(
+        model_config_->voices[voice_id].portrait.description);
   } else {
     control->setValueNormalized(static_cast<float>(normalized_value));
   }
@@ -200,6 +200,7 @@ void Editor::SyncModelDescription() {
   voice_combobox->removeAllEntry();
   model_voice_description_.SetModelDescription(u8"");
   model_voice_description_.SetVoiceDescription(u8"");
+  model_voice_description_.SetPortraitDescription(u8"");
   model_config_ = std::nullopt;
   portraits_.clear();
   if (!std::filesystem::exists(file) ||
@@ -243,9 +244,8 @@ void Editor::SyncModelDescription() {
         const auto original_bitmap =
             VSTGUI::owned(new CBitmap(platform_bitmap));
         const auto original_size = original_bitmap->getSize();
-        static constexpr auto kPortraitSize = 480;
-        if (original_size.x == kPortraitSize &&
-            original_size.y == kPortraitSize) {
+        if (original_size.x == kPortraitWidth &&
+            original_size.y == kPortraitHeight) {
           portraits_.insert({voice.portrait.path, original_bitmap});
           goto load_portrait_succeeded;
         }
@@ -255,7 +255,7 @@ void Editor::SyncModelDescription() {
         scale->setProperty(BitmapFilter::Standard::Property::kInputBitmap,
                            original_bitmap.get());
         scale->setProperty(BitmapFilter::Standard::Property::kOutputRect,
-                           CRect(0, 0, kPortraitSize, kPortraitSize));
+                           CRect(0, 0, kPortraitWidth, kPortraitHeight));
         if (!scale->run()) {
           goto load_portrait_failed;
         }
@@ -281,12 +281,11 @@ void Editor::SyncModelDescription() {
     const auto& voice = model_config_->voices[voice_id];
     portrait_view_->setBackground(portraits_.at(voice.portrait.path).get());
     portrait_view_->setDirty();
-    portrait_description_->setText(
-        reinterpret_cast<const char*>(voice.portrait.description.c_str()));
-    portrait_description_->setDirty();
     model_voice_description_.SetModelDescription(
         model_config_->model.description);
     model_voice_description_.SetVoiceDescription(voice.description);
+    model_voice_description_.SetPortraitDescription(voice.portrait.description);
+    
     if (auto* const column_view =
             model_voice_description_.model_description_->getParentView()) {
       column_view->setDirty();
@@ -613,7 +612,8 @@ auto Editor::MakeFileSelector(Context& context,
 }
 
 auto Editor::MakePortraitView(Context& context) -> CView* {
-  portrait_view_ = new CView(CRect(0, 0, kPortraitWidth, kPortraitHeight));
+  context.y += std::max(context.last_element_mergin, kElementMerginY);
+  portrait_view_ = new CView(CRect(0, 0, kPortraitWidth, kPortraitHeight).offset(context.x, context.y));
   context.column_elements.push_back(portrait_view_);
   context.y += kPortraitHeight;
   context.last_element_mergin = kElementMerginY;
@@ -627,7 +627,7 @@ auto Editor::MakeModelVoiceDescription(Context& context) -> CView* {
   model_voice_description_ = ModelVoiceDescription(
       CRect(context.x, context.y, context.column_width - offset_x,
             kWindowHeight - kFooterHeight),
-      VSTGUI::kNormalFont, kElementHeight, kElementMerginY + 4);
+      VSTGUI::kNormalFont, kElementHeight, kElementMerginY );
 
   context.column_elements.push_back(
       model_voice_description_.model_description_label_);
@@ -637,28 +637,12 @@ auto Editor::MakeModelVoiceDescription(Context& context) -> CView* {
       model_voice_description_.voice_description_label_);
   context.column_elements.push_back(
       model_voice_description_.voice_description_);
+  context.column_elements.push_back(
+      model_voice_description_.portrait_description_label_);
+  context.column_elements.push_back(
+      model_voice_description_.portrait_description_);
 
   return nullptr;
-}
-
-auto Editor::MakePortraitDescription(Context& context) -> CView* {
-  context.y += std::max(context.last_element_mergin, kElementMerginY);
-  const auto offset_x = context.x;
-  auto* const description = new CMultiLineTextLabel(
-      CRect(context.x, context.y, context.column_width - offset_x,
-            kWindowHeight - kFooterHeight));
-  description->setFont(font_);
-  description->setFontColor(kDarkColorScheme.on_surface);
-  description->setBackColor(kTransparentCColor);
-  description->setLineLayout(CMultiLineTextLabel::LineLayout::wrap);
-  description->setStyle(CParamDisplay::kNoFrame);
-  description->setHoriAlign(CHoriTxtAlign::kLeftText);
-  portrait_description_ = description;
-
-  context.column_elements.push_back(description);
-  context.y = kWindowHeight - kFooterHeight;
-  context.last_element_mergin = kElementMerginY;
-  return description;
 }
 
 }  // namespace beatrice::vst

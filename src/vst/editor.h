@@ -17,7 +17,7 @@
 
 namespace beatrice::vst {
 
-static constexpr auto kWindowWidth = 1280;
+static constexpr auto kWindowWidth = 1200;
 static constexpr auto kWindowHeight = 720;
 
 class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
@@ -53,7 +53,8 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kElementMerginY = 8;
   static constexpr auto kElementMerginX = 8;
   static constexpr auto kLabelWidth = kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementWidth - kElementMerginX;
-  static constexpr auto kPortraitWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX);
+  static constexpr auto kModelInfoColumnWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX );
+  static constexpr auto kPortraitWidth = kModelInfoColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX );
   static constexpr auto kPortraitHeight = kPortraitWidth;
   struct Context {
     int y = kHeaderHeight + kColumnMerginY;
@@ -76,15 +77,13 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto MakeFileSelector(Context&, ParamID param_id) -> CView*;
   auto MakePortraitView(Context&) -> CView*;
   auto MakeModelVoiceDescription(Context&) -> CView*;
-  auto MakePortraitDescription(Context&) -> CView*;
 
   std::map<ParamID, CControl*> controls_;
   CFontRef font_, font_bold_;
   std::optional<common::ModelConfig> model_config_;
 
-  ModelVoiceDescription model_voice_description_;
   CView* portrait_view_;
-  CMultiLineTextLabel* portrait_description_;
+  ModelVoiceDescription model_voice_description_;
 
   std::map<std::u8string, SharedPointer<CBitmap>> portraits_;
 };
