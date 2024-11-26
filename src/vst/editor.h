@@ -48,7 +48,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kInnerColumnMerginX = 12;
   static constexpr auto kGroupLabelMerginY = 12;
   static constexpr auto kGroupIndentX = 4;
-  static constexpr auto kElementWidth = 284;
+  static constexpr auto kElementWidth = 244;
   static constexpr auto kElementHeight = 24;
   static constexpr auto kElementMerginY = 8;
   static constexpr auto kElementMerginX = 8;
