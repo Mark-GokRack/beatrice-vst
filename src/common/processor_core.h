@@ -38,6 +38,10 @@ class ProcessorCoreBase {
   virtual auto SetInputGain(double /*input_gain*/) -> int { return 0; }
   virtual auto SetOutputGain(double /*output_gain*/) -> int { return 0; }
 
+  virtual auto SetSpeakerMergeRatio(
+    int /*num of targets*/, int* /*target indices*/, double* /*merge ratio*/
+  ) -> int { return 0; }
+
   friend class ProcessorProxy;
 };
 

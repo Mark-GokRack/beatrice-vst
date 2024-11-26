@@ -25,8 +25,7 @@ auto ProcessorCore0::Process(const float* const input, float* const output,
   if (target_speaker_ < 0) {
     goto fail;
   }
-  if (target_speaker_ >= static_cast<int>(speaker_embeddings_.size()) /
-                             BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS) {
+  if (target_speaker_ > n_speakers_) {
     goto fail;
   }
   if (static_cast<int>(formant_shift_embeddings_.size()) !=
@@ -102,15 +101,16 @@ auto ProcessorCore0::LoadModel(const ModelConfig& /*config*/,
                 (d / "waveform_generator.bin").u8string().c_str()))) {
       return static_cast<int>(err);
     }
-    int n_speakers;
     if (const auto err = Beatrice20a2_ReadNSpeakers(
             reinterpret_cast<const char*>(
                 (d / "speaker_embeddings.bin").u8string().c_str()),
-            &n_speakers)) {
+            &n_speakers_)) {
       return static_cast<int>(err);
     }
-    speaker_embeddings_.resize(n_speakers *
+    speaker_embeddings_.resize((n_speakers_+1) *
                                BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS);
+    std::memset( speaker_embeddings_.data(), 0, ( n_speakers_ + 1 ) *
+                               BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS * sizeof(float) );
     if (const auto err = Beatrice20a2_ReadSpeakerEmbeddings(
             reinterpret_cast<const char*>(
                 (d / "speaker_embeddings.bin").u8string().c_str()),
@@ -169,4 +169,30 @@ auto ProcessorCore0::SetOutputGain(const double new_output_gain) -> int {
   output_gain_context_.SetTargetGain(new_output_gain);
   return 0;
 }
+auto ProcessorCore0::SetSpeakerMergeRatio(
+  int n_list, int* target_list, double* ratio_list
+) -> int {
+  std::memset(
+    speaker_embeddings_.data() + n_speakers_* BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS,
+    0, BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS * sizeof(float)
+  );
+
+  double sum_ratios = 0;
+  for( auto i = 0; i < n_list; i++ ){
+    sum_ratios += ratio_list[i];
+  }
+  if( sum_ratios > 0 ){
+    for( auto i = 0; i < n_list; i++ ){
+      auto target_id = target_list[i];
+      auto ratio = ratio_list[i] / sum_ratios;
+      if( target_id >= 0 && target_id < n_speakers_ ){
+        for( auto j = 0; j < BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS; j++ ){
+          speaker_embeddings_[ n_speakers_ * BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS + j] 
+          += ratio * speaker_embeddings_[ target_id * BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS + j];
+        }
+      }
+    }
+  }
+  return 0;
 }  // namespace beatrice::common
+}

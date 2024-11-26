@@ -49,6 +49,9 @@ class ProcessorCore1 : public ProcessorCoreBase {
   auto SetPitchShift(double /*pitch_shift*/) -> int override;
   auto SetInputGain(double /*input_gain*/) -> int override;
   auto SetOutputGain(double /*output_gain*/) -> int override;
+  auto SetSpeakerMergeRatio(
+    int /*num of targets*/, int* /*target indices*/, double* /*merge ratio*/
+  ) -> int override;
 
  private:
   class ConvertWithModelBlockSize {
@@ -64,6 +67,7 @@ class ProcessorCore1 : public ProcessorCoreBase {
   int target_speaker_ = 0;
   double formant_shift_ = 0.0;
   double pitch_shift_ = 0.0;
+  int n_speakers_ = 0;
 
   resampler::AnyFreqInOut<ConvertWithModelBlockSize> any_freq_in_out_;
 
