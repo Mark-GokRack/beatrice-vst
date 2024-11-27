@@ -65,8 +65,8 @@ class ProcessorCoreBase {
     return ErrorCode::kSuccess;
   }
 
-  virtual auto SetSpeakerMergeRatio(
-    int /*num of targets*/, int* /*target indices*/, double* /*merge ratio*/
+  virtual auto SetSpeakerMergeWeight(
+    int /*target_speaker*/, double /*merge weight*/
   ) -> ErrorCode { return ErrorCode::kSuccess; }
 
   friend class ProcessorProxy;

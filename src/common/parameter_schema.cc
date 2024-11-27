@@ -317,6 +317,24 @@ const ParameterSchema kSchema = [] {
             [](ControllerCore&, double) { return ErrorCode::kSuccess; },
             [](ProcessorProxy&, double) { return ErrorCode::kSuccess; }));
   }
+  for (auto i = 0; i < kMaxNSpeakers; ++i) {
+    const auto i_ascii = std::to_string(i);
+    const auto i_u8 = std::u8string(i_ascii.begin(), i_ascii.end());
+    schema.AddParameter(
+        static_cast<ParameterID>(
+            static_cast<int>(ParameterID::kSpeakerMergeWeight) + i),
+        NumberParameter(
+            u8"SpeakerMergeWeight "s + i_u8, 0.0, 0.0, 1.0, u8""s, 128 * 8, u8"MrgWght"s,
+            parameter_flag::kCanAutomate,
+            [](ControllerCore&, double) { return ErrorCode::kSuccess; },
+            [i](ProcessorProxy& vc, double value) { 
+              return vc.GetCore()->SetSpeakerMergeWeight( i, value );
+            }
+            // ここ、NumberParameter::processor_set_value_ が関数ポインタのままだと
+            // キャプチャ付きのラムダ式を格納できなかった。
+            // std::function を用いる定義に書き直すと格納できるようになる。
+        ));
+  }
 
   return schema;
 }();
