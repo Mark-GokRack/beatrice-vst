@@ -187,7 +187,7 @@ auto ProcessorCore0::LoadModel(const ModelConfig& /*config*/,
   }
   speaker_embeddings_.resize( n_speakers_ *
                              BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS);
-  speaker_merge_weights_.resize( n_speakers_ );
+  speaker_merge_weights_.resize( n_speakers_ , 1.0f );
   if (const auto err = Beatrice20a2_ReadSpeakerEmbeddings(
           reinterpret_cast<const char*>(
               (d / "speaker_embeddings.bin").u8string().c_str()),

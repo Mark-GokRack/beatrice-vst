@@ -248,9 +248,15 @@ void Editor::SyncModelDescription() {
         reinterpret_cast<const char*>(model_config_->model.name.c_str()));
     // 話者のリストを読み込む。
     // また、予め portrait を読み込んで、必要に応じてリサイズしておく。
+    bool isFirstEmpty = true;
     for (const auto& voice : model_config_->voices) {
       if (voice.name.empty() && voice.description.empty() &&
           voice.portrait.path.empty() && voice.portrait.description.empty()) {
+        if( isFirstEmpty ){
+          isFirstEmpty = false;
+          voice_combobox->addEntry("merged voice");
+          goto load_portrait_failed;
+        }
         break;
       }
       voice_combobox->addEntry(

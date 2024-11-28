@@ -49,6 +49,26 @@ const ParameterSchema kSchema = [] {
                                                   0.0);
              controller.updated_parameters_.push_back(
                  ParameterID::kFormantShift);
+             // MergedVoiceIndex
+             
+             auto merged_voice_id = 0;
+             for ( auto i = 0; i < kMaxNSpeakers; ++i ) {
+                const auto& voice = model_config.voices[i];
+                if (voice.name.empty() && voice.description.empty() &&
+                    voice.portrait.path.empty() && voice.portrait.description.empty()) {
+                  merged_voice_id = i;
+                  break;
+                }
+             }
+             
+             controller.parameter_state_.SetValue(ParameterID::kMergedVoiceIndex, (double)merged_voice_id);
+             controller.updated_parameters_.push_back(ParameterID::kMergedVoiceIndex);
+             double average_merge_pitch = 0;
+             for (auto i = 0; i < merged_voice_id; ++i) {
+              average_merge_pitch += model_config.voices[i].average_pitch;
+             }
+             average_merge_pitch /= merged_voice_id;
+             model_config.voices[merged_voice_id].average_pitch = average_merge_pitch;
              // AverageTargetPitches
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
                controller.parameter_state_.SetValue(
@@ -61,6 +81,18 @@ const ParameterSchema kSchema = [] {
                        static_cast<int>(ParameterID::kAverageTargetPitchBase) +
                        i));
              }
+             // kSpeakerMergeWeights
+             for (auto i = 0; i < kMaxNSpeakers; ++i) {
+               controller.parameter_state_.SetValue(
+                   static_cast<ParameterID>(
+                       static_cast<int>(ParameterID::kSpeakerMergeWeight) +
+                       i), 1.0);
+               controller.updated_parameters_.push_back(
+                   static_cast<ParameterID>(
+                       static_cast<int>(ParameterID::kSpeakerMergeWeight) +
+                       i));
+             }
+   
              const auto average_target_pitch =
                  model_config.voices[0].average_pitch;
              switch (std::get<int>(
@@ -303,6 +335,13 @@ const ParameterSchema kSchema = [] {
            [](ProcessorProxy& vc, const int value) {
              return vc.GetCore()->SetPitchCorrectionType(value);
            })},
+      {ParameterID::kMergedVoiceIndex,
+        NumberParameter(
+            u8"MergedVoiceIndex"s, kMaxNSpeakers-1.0, 0.0, kMaxNSpeakers-1.0, u8""s, kMaxNSpeakers, u8"MrgID"s,
+            parameter_flag::kIsReadOnly | parameter_flag::kIsHidden,
+            [](ControllerCore&, double) { return ErrorCode::kSuccess; },
+            [](ProcessorProxy&, double) { return ErrorCode::kSuccess; }
+        )},
   });
 
   for (auto i = 0; i < kMaxNSpeakers; ++i) {
@@ -324,9 +363,39 @@ const ParameterSchema kSchema = [] {
         static_cast<ParameterID>(
             static_cast<int>(ParameterID::kSpeakerMergeWeight) + i),
         NumberParameter(
-            u8"SpeakerMergeWeight "s + i_u8, 0.0, 0.0, 1.0, u8""s, 128 * 8, u8"MrgWght"s,
+            u8"SpeakerMergeWeight "s + i_u8, 1.0, 0.0, 1.0, u8""s, 101, u8"MrgWght"s,
             parameter_flag::kCanAutomate,
-            [](ControllerCore&, double) { return ErrorCode::kSuccess; },
+            [](ControllerCore& controller, double value) {
+              /*
+              // マージの比率に応じて AverageTargetPitchBase も変える？
+              // ここまでする必要ってあるのかな？
+              auto merged_voice_id = static_cast<int>( std::get<double>(
+                controller.parameter_state_.GetValue( ParameterID::kMergedVoiceIndex )) );
+              double weighted_average_pitch = 0.0;
+              double simple_average_pitch = 0.0;
+              double sum_weights = 0.0;
+              for( auto i = 0; i < merged_voice_id; i++){
+                auto weight = std::get<double>(
+                  controller.parameter_state_.GetValue(static_cast<ParameterID>(
+                    static_cast<int>(ParameterID::kSpeakerMergeWeight) + i)));
+                auto avg_pitch = std::get<double>(
+                  controller.parameter_state_.GetValue(static_cast<ParameterID>(
+                    static_cast<int>(ParameterID::kAverageTargetPitchBase) + i)));
+                weighted_average_pitch += weight * avg_pitch;
+                simple_average_pitch += avg_pitch;
+                sum_weights += weight;
+              }
+              if( sum_weights > 0 ){
+                weighted_average_pitch /= sum_weights;
+              }else{
+                weighted_average_pitch = simple_average_pitch / merged_voice_id;
+              }
+              controller.parameter_state_.SetValue(static_cast<ParameterID>(
+                static_cast<int>(ParameterID::kAverageTargetPitchBase) + merged_voice_id),
+                weighted_average_pitch);
+              */
+              return ErrorCode::kSuccess;
+            },
             [i](ProcessorProxy& vc, double value) { 
               return vc.GetCore()->SetSpeakerMergeWeight( i, value );
             }

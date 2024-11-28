@@ -54,7 +54,8 @@ enum class ParameterID : int {
   kPitchCorrection = 10,
   kPitchCorrectionType = 11,
   kAverageTargetPitchBase = 100,
-  kSpeakerMergeWeight = kAverageTargetPitchBase + kMaxNSpeakers,
+  kMergedVoiceIndex = kAverageTargetPitchBase + kMaxNSpeakers,
+  kSpeakerMergeWeight = kMergedVoiceIndex + 1,
   kSentinel = kSpeakerMergeWeight + kMaxNSpeakers,
 };
 
