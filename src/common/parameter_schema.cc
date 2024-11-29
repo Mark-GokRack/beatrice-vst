@@ -51,7 +51,7 @@ const ParameterSchema kSchema = [] {
                  ParameterID::kFormantShift);
              // MergedVoiceIndex
              
-             auto merged_voice_id = 0;
+             auto merged_voice_id = kMaxNSpeakers;
              for ( auto i = 0; i < kMaxNSpeakers; ++i ) {
                 const auto& voice = model_config.voices[i];
                 if (voice.name.empty() && voice.description.empty() &&
@@ -63,12 +63,14 @@ const ParameterSchema kSchema = [] {
              
              controller.parameter_state_.SetValue(ParameterID::kMergedVoiceIndex, (double)merged_voice_id);
              controller.updated_parameters_.push_back(ParameterID::kMergedVoiceIndex);
-             double average_merge_pitch = 0;
-             for (auto i = 0; i < merged_voice_id; ++i) {
-              average_merge_pitch += model_config.voices[i].average_pitch;
+             if( merged_voice_id < kMaxNSpeakers ){
+              double average_merge_pitch = 0;
+              for (auto i = 0; i < merged_voice_id; ++i) {
+                average_merge_pitch += model_config.voices[i].average_pitch;
+              }
+              average_merge_pitch /= merged_voice_id;
+              model_config.voices[merged_voice_id].average_pitch = average_merge_pitch;
              }
-             average_merge_pitch /= merged_voice_id;
-             model_config.voices[merged_voice_id].average_pitch = average_merge_pitch;
              // AverageTargetPitches
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
                controller.parameter_state_.SetValue(
@@ -337,7 +339,7 @@ const ParameterSchema kSchema = [] {
            })},
       {ParameterID::kMergedVoiceIndex,
         NumberParameter(
-            u8"MergedVoiceIndex"s, kMaxNSpeakers-1.0, 0.0, kMaxNSpeakers-1.0, u8""s, kMaxNSpeakers, u8"MrgID"s,
+            u8"MergedVoiceIndex"s, kMaxNSpeakers, 0.0, kMaxNSpeakers, u8""s, kMaxNSpeakers, u8"MrgID"s,
             parameter_flag::kIsReadOnly | parameter_flag::kIsHidden,
             [](ControllerCore&, double) { return ErrorCode::kSuccess; },
             [](ProcessorProxy&, double) { return ErrorCode::kSuccess; }
@@ -363,7 +365,7 @@ const ParameterSchema kSchema = [] {
         static_cast<ParameterID>(
             static_cast<int>(ParameterID::kSpeakerMergeWeight) + i),
         NumberParameter(
-            u8"SpeakerMergeWeight "s + i_u8, 1.0, 0.0, 1.0, u8""s, 101, u8"MrgWght"s,
+            u8"SpeakerMergeWeight "s + i_u8, 1.0, 0.0, 1.0, u8""s, 100, u8"MrgWght"s,
             parameter_flag::kCanAutomate,
             [](ControllerCore& controller, double value) {
               /*
@@ -396,12 +398,12 @@ const ParameterSchema kSchema = [] {
               */
               return ErrorCode::kSuccess;
             },
-            [i](ProcessorProxy& vc, double value) { 
-              return vc.GetCore()->SetSpeakerMergeWeight( i, value );
-            }
             // ここ、NumberParameter::processor_set_value_ が関数ポインタのままだと
             // キャプチャ付きのラムダ式を格納できなかった。
             // std::function を用いる定義に書き直すと格納できるようになる。
+            [i](ProcessorProxy& vc, double value) { 
+              return vc.GetCore()->SetSpeakerMergeWeight( i, value );
+            }
         ));
   }
 
