@@ -8,7 +8,9 @@
 #include "beatricelib/beatrice.h"
 
 // Beatrice
+#include "common/error.h"
 #include "common/gain.h"
+#include "common/model_config.h"
 #include "common/processor_core.h"
 #include "common/resample.h"
 
@@ -39,16 +41,25 @@ class ProcessorCore0 : public ProcessorCoreBase {
   }
   [[nodiscard]] auto GetVersion() const -> int override;
   auto Process(const float* input, float* output,
-               int n_samples) -> int override;
-  auto ResetContext() -> int override;
+               int n_samples) -> ErrorCode override;
+  auto ResetContext() -> ErrorCode override;
   auto LoadModel(const ModelConfig& /*config*/,
-                 const std::filesystem::path& /*file*/) -> int override;
-  auto SetSampleRate(double /*sample_rate*/) -> int override;
-  auto SetTargetSpeaker(int /*target_speaker*/) -> int override;
-  auto SetFormantShift(double /*formant_shift*/) -> int override;
-  auto SetPitchShift(double /*pitch_shift*/) -> int override;
-  auto SetInputGain(double /*input_gain*/) -> int override;
-  auto SetOutputGain(double /*output_gain*/) -> int override;
+                 const std::filesystem::path& /*file*/) -> ErrorCode override;
+  auto SetSampleRate(double /*sample_rate*/) -> ErrorCode override;
+  auto SetTargetSpeaker(int /*target_speaker*/) -> ErrorCode override;
+  auto SetFormantShift(double /*formant_shift*/) -> ErrorCode override;
+  auto SetPitchShift(double /*pitch_shift*/) -> ErrorCode override;
+  auto SetInputGain(double /*input_gain*/) -> ErrorCode override;
+  auto SetOutputGain(double /*output_gain*/) -> ErrorCode override;
+  auto SetAverageSourcePitch(double /*average_pitch*/) -> ErrorCode override;
+  auto SetIntonationIntensity(double /*intonation_intensity*/)
+      -> ErrorCode override;
+  auto SetPitchCorrection(double /*pitch_correction*/) -> ErrorCode override;
+  auto SetPitchCorrectionType(int /*pitch_correction_type*/)
+      -> ErrorCode override;
+  auto SetSpeakerMergeWeight(
+    int /*target_speaker*/, double /*merge weight*/
+  ) -> ErrorCode override;
 
  private:
   class ConvertWithModelBlockSize {
@@ -64,6 +75,11 @@ class ProcessorCore0 : public ProcessorCoreBase {
   int target_speaker_ = 0;
   double formant_shift_ = 0.0;
   double pitch_shift_ = 0.0;
+  int n_speakers_ = 0;
+  double average_source_pitch_ = 52.0;
+  double intonation_intensity_ = 1.0;
+  double pitch_correction_ = 0.0;
+  int pitch_correction_type_ = 0;
 
   resampler::AnyFreqInOut<ConvertWithModelBlockSize> any_freq_in_out_;
 
@@ -80,6 +96,7 @@ class ProcessorCore0 : public ProcessorCoreBase {
   Beatrice20a2_WaveformContext1* waveform_context_;
   Gain::Context input_gain_context_;
   Gain::Context output_gain_context_;
+  std::vector<float> speaker_merge_weights_;
 
   inline auto IsLoaded() -> bool { return !model_file_.empty(); }
   void Process1(const float* input, float* output);
