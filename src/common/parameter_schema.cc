@@ -83,15 +83,15 @@ const ParameterSchema kSchema = [] {
                        static_cast<int>(ParameterID::kAverageTargetPitchBase) +
                        i));
              }
-             // kSpeakerMergeWeights
+             // kVoiceMergeWeights
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
                controller.parameter_state_.SetValue(
                    static_cast<ParameterID>(
-                       static_cast<int>(ParameterID::kSpeakerMergeWeight) +
-                       i), 1.0);
+                       static_cast<int>(ParameterID::kVoiceMergeWeight) +
+                       i), 0.0);
                controller.updated_parameters_.push_back(
                    static_cast<ParameterID>(
-                       static_cast<int>(ParameterID::kSpeakerMergeWeight) +
+                       static_cast<int>(ParameterID::kVoiceMergeWeight) +
                        i));
              }
    
@@ -363,9 +363,9 @@ const ParameterSchema kSchema = [] {
     const auto i_u8 = std::u8string(i_ascii.begin(), i_ascii.end());
     schema.AddParameter(
         static_cast<ParameterID>(
-            static_cast<int>(ParameterID::kSpeakerMergeWeight) + i),
+            static_cast<int>(ParameterID::kVoiceMergeWeight) + i),
         NumberParameter(
-            u8"SpeakerMergeWeight "s + i_u8, 1.0, 0.0, 1.0, u8""s, 100, u8"MrgWght"s,
+            u8"Voice "s + i_u8 + u8"'s Weight"s , 0.0, 0.0, 1.0, u8""s, 100, u8"VcWght"s,
             parameter_flag::kCanAutomate,
             [](ControllerCore& controller, double value) {
               /*
@@ -379,7 +379,7 @@ const ParameterSchema kSchema = [] {
               for( auto i = 0; i < merged_voice_id; i++){
                 auto weight = std::get<double>(
                   controller.parameter_state_.GetValue(static_cast<ParameterID>(
-                    static_cast<int>(ParameterID::kSpeakerMergeWeight) + i)));
+                    static_cast<int>(ParameterID::kVoiceMergeWeight) + i)));
                 auto avg_pitch = std::get<double>(
                   controller.parameter_state_.GetValue(static_cast<ParameterID>(
                     static_cast<int>(ParameterID::kAverageTargetPitchBase) + i)));
@@ -403,6 +403,23 @@ const ParameterSchema kSchema = [] {
             // std::function を用いる定義に書き直すと格納できるようになる。
             [i](ProcessorProxy& vc, double value) { 
               return vc.GetCore()->SetSpeakerMergeWeight( i, value );
+            }
+        ));
+  }
+  for (auto i = 0; i < kMaxNSpeakers; ++i) {
+    const auto i_ascii = std::to_string(i);
+    const auto i_u8 = std::u8string(i_ascii.begin(), i_ascii.end());
+    schema.AddParameter(
+        static_cast<ParameterID>(
+            static_cast<int>(ParameterID::kVoiceMergeLabels) + i),
+        StringParameter(
+            u8"Voice "s + i_u8 + u8"'s Weight"s,
+            u8""s, true,
+            [](ControllerCore& controller, const std::u8string& value) {
+              return ErrorCode::kSuccess;
+            },
+            [](ProcessorProxy& vc, const std::u8string& value) { 
+              return ErrorCode::kSuccess;
             }
         ));
   }

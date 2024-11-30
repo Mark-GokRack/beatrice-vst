@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <string>
 
 #include "vst3sdk/pluginterfaces/vst/vsttypes.h"
 #include "vst3sdk/public.sdk/source/vst/utility/stringconvert.h"
@@ -44,13 +45,17 @@ using VSTGUI::CViewContainer;
 using VSTGUI::getPlatformFactory;
 using VSTGUI::kBoldFace;
 using VSTGUI::kNormalFont;
+
+using std::operator""s;
+
 namespace BitmapFilter = VSTGUI::BitmapFilter;
 
 Editor::Editor(void* const controller)
     : VSTGUIEditor(controller),
       font_(new CFontDesc(kNormalFont->getName(), 14)),
       font_bold_(new CFontDesc(kNormalFont->getName(), 14, kBoldFace)),
-      portrait_view_() {
+      portrait_view_(),
+      merge_weight_view_() {
   setRect(ViewRect(0, 0, kWindowWidth, kWindowHeight));
 }
 
@@ -104,7 +109,7 @@ auto PLUGIN_API Editor::open(void* const parent,
 
   auto context = Context();  // オフセット設定
   BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_1);
-  BeginGroup(context, u8"General Control");
+  BeginGroup(context, u8"General");
   MakeSlider(context, static_cast<ParamID>(ParameterID::kInputGain), 1);
   MakeSlider(context, static_cast<ParamID>(ParameterID::kOutputGain), 1);
   MakeSlider(context, static_cast<ParamID>(ParameterID::kPitchShift), 2);
@@ -121,16 +126,21 @@ auto PLUGIN_API Editor::open(void* const parent,
   EndColumn(context);
 
   BeginColumn(context, kColumnWidth, kDarkColorScheme.surface_2);
-  BeginGroup(context, u8"Model Control");
+  BeginGroup(context, u8"Model");
   MakeFileSelector(context, static_cast<ParamID>(ParameterID::kModel));
   MakeCombobox(context, static_cast<ParamID>(ParameterID::kVoice),
                kDarkColorScheme.primary, kDarkColorScheme.on_primary);
   MakeSlider(context, static_cast<ParamID>(ParameterID::kFormantShift), 2);
   EndGroup(context);
+  
+  BeginGroup(context, u8"Voice Merge");
+  MakeVoiceMergeView(context);
+  EndGroup(context);  
+
   EndColumn(context);
 
   BeginColumn(context, kModelInfoColumnWidth, kDarkColorScheme.surface_3);
-  BeginGroup(context, u8"Model Info");
+  BeginGroup(context, u8"Information");
   MakePortraitView(context);
   MakeModelVoiceDescription(context);
   EndGroup(context);
@@ -155,6 +165,7 @@ void PLUGIN_API Editor::close() {
     frame = nullptr;
     portraits_.clear();
     portrait_view_ = nullptr;
+    merge_weight_view_ = nullptr;
   }
 }
 
@@ -249,18 +260,21 @@ void Editor::SyncModelDescription() {
     // 話者のリストを読み込む。
     // また、予め portrait を読み込んで、必要に応じてリサイズしておく。
     bool isFirstEmpty = true;
+    int voice_counter = 0;
     for (const auto& voice : model_config_->voices) {
       if (voice.name.empty() && voice.description.empty() &&
           voice.portrait.path.empty() && voice.portrait.description.empty()) {
         if( isFirstEmpty ){
           isFirstEmpty = false;
-          voice_combobox->addEntry("merged voice");
+          voice_combobox->addEntry("Voice Merge Mode");
           goto load_portrait_failed;
         }
         break;
       }
+      voice_counter++;
       voice_combobox->addEntry(
           reinterpret_cast<const char*>(voice.name.c_str()));
+      
       // portrait
       {
         if (portraits_.contains(voice.portrait.path)) {
@@ -310,6 +324,31 @@ void Editor::SyncModelDescription() {
     load_portrait_succeeded: {}
     }
     voice_combobox->setDirty();
+    for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
+      auto* const slider = static_cast<Slider*>(
+          controls_.at(static_cast<ParamID>(
+            static_cast<int>( ParameterID::kVoiceMergeWeight ) + i )) );
+      auto* const label = static_cast<CTextLabel*>(
+          controls_.at(static_cast<ParamID>(
+            static_cast<int>(ParameterID::kVoiceMergeLabels) + i )));
+      if( i < voice_counter ){
+        slider->setVisible(true);
+        label->setVisible(true);
+        label->setText( reinterpret_cast<const char*>(
+          model_config_->voices[i].name.c_str() ));
+      }else{
+        slider->setVisible(false);
+        label->setVisible(false);
+        label->setText( "" );
+      }
+      slider->setDirty();
+      label->setDirty();
+    }
+    merge_weight_view_->setContainerSize(
+      CRect(0, 0, kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ), 
+        voice_counter * ( kElementHeight + kElementMerginY ) )
+    );
+    merge_weight_view_->setDirty();
     const auto voice_id =
         Denormalize(std::get<common::ListParameter>(
                         common::kSchema.GetParameter(ParameterID::kVoice)),
@@ -492,7 +531,10 @@ auto Editor::BeginGroup(Context& context, const std::u8string& name) -> CView* {
   return group_label;
 }
 
-void Editor::EndGroup(Context& context) { context.x -= kGroupIndentX; }
+void Editor::EndGroup(Context& context) {
+   context.x -= kGroupIndentX;
+   context.y += kElementMerginY;
+}
 
 // NumberParameter 用
 auto Editor::MakeSlider(Context& context, const ParamID param_id,
@@ -513,7 +555,7 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
   const auto title_pos = CRect(0, 0, kLabelWidth, kElementHeight)
                              .offset(context.x, context.y);
   const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().title);
   auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
                                              nullptr, CParamDisplay::kNoFrame);
   title_control->setBackColor(kTransparentCColor);
@@ -527,7 +569,7 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
       CRect(0, 0, kElementWidth, kElementHeight).offset( slider_offset_x, context.y),
       this, static_cast<int>(param_id), slider_offset_x,
       slider_offset_x + kElementWidth - kHandleWidth, handle_bmp, slider_bmp,
-      VST3::StringConvert::convert(param->getInfo().units), font_, precision);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().units), font_, precision);
   slider_control->setValueNormalized(
       static_cast<float>(param->getNormalized()));
   context.column_elements.push_back(slider_control);
@@ -559,7 +601,7 @@ auto Editor::MakeCombobox(
   const auto title_pos = CRect(0, 0, kLabelWidth, kElementHeight)
                              .offset(context.x, context.y);
   const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().title);
   auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
                                              nullptr, CParamDisplay::kNoFrame);
   title_control->setBackColor(kTransparentCColor);
@@ -577,7 +619,7 @@ auto Editor::MakeCombobox(
   for (auto i = 0; i <= step_count; ++i) {
     String128 tmp_string128;
     param->toString(param->toNormalized(i), tmp_string128);
-    const auto name = VST3::StringConvert::convert(tmp_string128);
+    const auto name = Steinberg::Vst::StringConvert::convert(tmp_string128);
     control->addEntry(name.c_str());
   }
   control->setValueNormalized(
@@ -680,7 +722,7 @@ auto Editor::MakeModelVoiceDescription(Context& context) -> CView* {
   model_voice_description_ = ModelVoiceDescription(
       CRect(context.x, context.y, context.column_width - offset_x,
             kWindowHeight - kFooterHeight),
-      VSTGUI::kNormalFont, kElementHeight, kElementMerginY );
+      VSTGUI::kNormalFontSmall, kElementHeight, kElementMerginY );
 
   context.column_elements.push_back(
       model_voice_description_.model_description_label_);
@@ -697,5 +739,81 @@ auto Editor::MakeModelVoiceDescription(Context& context) -> CView* {
 
   return nullptr;
 }
+
+auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
+  context.y += std::max(context.last_element_mergin, 24);
+  //const auto button_width = ( kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementMerginX ) / 2;
+
+  const auto size =  CRect(0, 0,
+          kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ),
+          kWindowHeight- kFooterHeight - kHeaderHeight - context.y ).offset( context.x, context.y );
+  const auto container_size = CRect(0, 0,
+          size.getWidth(), ( kElementHeight + kElementMerginY ) * common::kMaxNSpeakers );
+  merge_weight_view_ = new VSTGUI::CScrollView(
+    size, container_size,
+    VSTGUI::CScrollView::kVerticalScrollbar | VSTGUI::CScrollView::kDontDrawFrame
+    | VSTGUI::CScrollView::kOverlayScrollbars | VSTGUI::CScrollView::kAutoHideScrollbars
+  );
+  merge_weight_view_->setAutosizeFlags( VSTGUI::kAutosizeRow | VSTGUI::kAutosizeBottom );
+  merge_weight_view_->setBackgroundColor(kTransparentCColor);
+  
+  static constexpr auto kHandleWidth = 10;  // 透明の左右の淵を含む
+  auto* const slider_bmp =
+      new MonotoneBitmap(kElementWidth, kElementHeight, kTransparentCColor,
+                         kDarkColorScheme.outline);
+  auto* const handle_bmp =
+      new MonotoneBitmap(kHandleWidth, kElementHeight,
+                         kDarkColorScheme.secondary_dim, kTransparentCColor);
+
+  for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
+    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMergeLabels) + i;
+    auto const param_id = static_cast<ParameterID>(vst_param_id);
+    const auto param =
+        std::get<common::StringParameter>(common::kSchema.GetParameter(param_id));
+    const auto label_pos = CRect(0, 0, kLabelWidth, kElementHeight)
+                              .offset(0, i * ( kElementHeight + kElementMerginY ) );
+    const auto label_string = reinterpret_cast<const char*>( param.GetDefaultValue().c_str() );
+    auto* const label_control = new CTextLabel(label_pos, label_string,
+                                              nullptr, CParamDisplay::kNoFrame);
+    label_control->setTag( static_cast<int>(param_id ));
+    label_control->setBackColor(kTransparentCColor);
+    label_control->setFont(font_);
+    label_control->setFontColor(kDarkColorScheme.on_surface);
+    label_control->setHoriAlign(CHoriTxtAlign::kCenterText);
+    label_control->setVisible(false);
+
+    merge_weight_view_->addView( label_control );
+    controls_.insert({vst_param_id, label_control});
+  }
+  for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
+    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMergeWeight) + i;
+    auto const param_id = static_cast<ParamID>(vst_param_id);
+    auto* const param =
+        static_cast<LinearParameter*>(controller->getParameterObject(param_id));
+    const auto slider_offset_x = kLabelWidth + kElementMerginX;
+    const auto slider_width = kElementWidth - merge_weight_view_->getScrollbarWidth();
+    auto* const slider_control = new Slider(
+        CRect(0, 0, kElementWidth - merge_weight_view_->getScrollbarWidth(), kElementHeight)
+        .offset( slider_offset_x, i * ( kElementHeight + kElementMerginY ) ),
+        this, static_cast<int>(param_id), slider_offset_x,
+        slider_offset_x + slider_width - kHandleWidth, handle_bmp, slider_bmp,
+        Steinberg::Vst::StringConvert::convert(param->getInfo().units), font_, 2);
+    slider_control->setValueNormalized(
+        static_cast<float>(param->getNormalized()));
+    slider_control->setVisible(false);
+
+    merge_weight_view_->addView( slider_control );
+    controls_.insert({vst_param_id, slider_control});
+  }
+
+  slider_bmp->forget();
+  handle_bmp->forget();
+
+  context.column_elements.push_back( merge_weight_view_ );
+  return merge_weight_view_;
+}
+
+
+
 
 }  // namespace beatrice::vst

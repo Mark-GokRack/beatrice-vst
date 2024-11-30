@@ -10,6 +10,7 @@
 #include "vst3sdk/pluginterfaces/vst/vsttypes.h"
 #include "vst3sdk/public.sdk/source/vst/vstguieditor.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cview.h"
+#include "vst3sdk/vstgui4/vstgui/lib/cscrollview.h"
 
 // Beatrice
 #include "common/model_config.h"
@@ -18,7 +19,7 @@
 namespace beatrice::vst {
 
 static constexpr auto kWindowWidth = 1200;
-static constexpr auto kWindowHeight = 720;
+static constexpr auto kWindowHeight = 800;
 
 class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   using ParamID = Steinberg::Vst::ParamID;
@@ -54,7 +55,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kElementMerginX = 8;
   static constexpr auto kLabelWidth = kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementWidth - kElementMerginX;
   static constexpr auto kModelInfoColumnWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX );
-  static constexpr auto kPortraitWidth = kModelInfoColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX );
+  static constexpr auto kPortraitWidth = kModelInfoColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX + kElementMerginX );
   static constexpr auto kPortraitHeight = kPortraitWidth;
   struct Context {
     int y = kHeaderHeight + kColumnMerginY;
@@ -77,6 +78,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto MakeFileSelector(Context&, ParamID param_id) -> CView*;
   auto MakePortraitView(Context&) -> CView*;
   auto MakeModelVoiceDescription(Context&) -> CView*;
+  auto MakeVoiceMergeView(Context&) -> CView*;
 
   std::map<ParamID, CControl*> controls_;
   CFontRef font_, font_bold_;
@@ -84,6 +86,8 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
 
   CView* portrait_view_;
   ModelVoiceDescription model_voice_description_;
+
+  VSTGUI::CScrollView* merge_weight_view_;
 
   std::map<std::u8string, SharedPointer<CBitmap>> portraits_;
 };

@@ -1,6 +1,6 @@
 # Beatrice VST
 
-[Beatrice 2](https://prj-beatrice.com) の公式 VST です。
+[Beatrice 2](https://prj-beatrice.com) の ~~公式~~ 私家版 VST です。
 
 
 
@@ -32,7 +32,7 @@
     ```
   - cmakeによるビルドを実行すると、ユーザーのホームディレクトリ(%USERPROFILE%)以下の "\AppData\Local\Programs\Common\VST3" フォルダにビルドしたファイルへのシンボリックリンクが作成される。
 
-## ビルド時のトラブルシューティング
+## Trouble shooting
 
 ### Debug ビルドが出来ない
 - 公開されている beatrice.lib が Release ビルドされているものなので、Debug ビルドは出来ません。
