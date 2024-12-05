@@ -19,7 +19,7 @@
 namespace beatrice::vst {
 
 static constexpr auto kWindowWidth = 1200;
-static constexpr auto kWindowHeight = 800;
+static constexpr auto kWindowHeight = 720;
 
 class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   using ParamID = Steinberg::Vst::ParamID;

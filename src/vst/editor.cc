@@ -344,11 +344,6 @@ void Editor::SyncModelDescription() {
       slider->setDirty();
       label->setDirty();
     }
-    merge_weight_view_->setContainerSize(
-      CRect(0, 0, kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ), 
-        voice_counter * ( kElementHeight + kElementMerginY ) )
-    );
-    merge_weight_view_->setDirty();
     const auto voice_id =
         Denormalize(std::get<common::ListParameter>(
                         common::kSchema.GetParameter(ParameterID::kVoice)),
@@ -361,7 +356,17 @@ void Editor::SyncModelDescription() {
         model_config_->model.description);
     model_voice_description_.SetVoiceDescription(voice.description);
     model_voice_description_.SetPortraitDescription(voice.portrait.description);
-    
+
+    merge_weight_view_->setContainerSize(
+      CRect(0, 0, kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ), 
+        voice_counter * ( kElementHeight + kElementMerginY ) )
+    );
+    if( voice_id == voice_counter){
+      merge_weight_view_->setVisible(true);
+    }else{
+      merge_weight_view_->setVisible(false);
+    }
+    merge_weight_view_->setDirty();
     if (auto* const column_view =
             model_voice_description_.model_description_->getParentView()) {
       column_view->setDirty();
@@ -411,6 +416,13 @@ void Editor::valueChanged(CControl* const pControl) {
     const auto* const list_param = std::get_if<common::ListParameter>(&param);
     assert(list_param);
     const auto plain_value = static_cast<int>(control->getValue());
+    if( vst_param_id == static_cast<int>(ParameterID::kVoice)){
+      if( plain_value == static_cast<int>(control->getMax()) && plain_value < common::kMaxNSpeakers-1 ){
+        merge_weight_view_->setVisible(true);
+      }else{
+        merge_weight_view_->setVisible(false);
+      }
+    }
     if (plain_value ==
         std::get<int>(core.parameter_state_.GetValue(param_id))) {
       return;
@@ -808,6 +820,8 @@ auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
 
   slider_bmp->forget();
   handle_bmp->forget();
+
+  merge_weight_view_->setVisible(false);
 
   context.column_elements.push_back( merge_weight_view_ );
   return merge_weight_view_;
