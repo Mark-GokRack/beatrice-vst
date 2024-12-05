@@ -57,8 +57,8 @@ class ProcessorCore0 : public ProcessorCoreBase {
   auto SetPitchCorrection(double /*pitch_correction*/) -> ErrorCode override;
   auto SetPitchCorrectionType(int /*pitch_correction_type*/)
       -> ErrorCode override;
-  auto SetSpeakerMergeWeight(
-    int /*target_speaker*/, double /*merge weight*/
+  auto SetSpeakerMorphingWeight(
+    int /*target_speaker*/, double /*morphing weight*/
   ) -> ErrorCode override;
 
  private:
@@ -96,7 +96,7 @@ class ProcessorCore0 : public ProcessorCoreBase {
   Beatrice20a2_WaveformContext1* waveform_context_;
   Gain::Context input_gain_context_;
   Gain::Context output_gain_context_;
-  std::vector<float> speaker_merge_weights_;
+  std::vector<float> speaker_morphing_weights_;
 
   inline auto IsLoaded() -> bool { return !model_file_.empty(); }
   void Process1(const float* input, float* output);

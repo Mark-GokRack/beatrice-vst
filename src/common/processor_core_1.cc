@@ -124,12 +124,12 @@ void ProcessorCore1::Process1(const float* const input, float* const output) {
                 sizeof(float) * BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS);
   } else {
     float sum_weights = .0f;
-    for( auto w : speaker_merge_weights_ ){
+    for( auto w : speaker_morphing_weights_ ){
       sum_weights += w;
     }
     if( sum_weights > 0 ){
       for( auto t = 0; t < n_speakers_; t++ ){
-        auto ratio = speaker_merge_weights_[t] / sum_weights;
+        auto ratio = speaker_morphing_weights_[t] / sum_weights;
         for( auto i = 0; i < BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS; i++ ){
           speaker[i]+= ratio * speaker_embeddings_[ t * BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS + i];
         }
@@ -190,7 +190,7 @@ auto ProcessorCore1::LoadModel(const ModelConfig& /*config*/,
   }
   speaker_embeddings_.resize( n_speakers_ *
                              BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS);
-  speaker_merge_weights_.resize( n_speakers_, 1.0f );
+  speaker_morphing_weights_.resize( n_speakers_, 1.0f );
   if (const auto err = Beatrice20b1_ReadSpeakerEmbeddings(
           reinterpret_cast<const char*>(
               (d / "speaker_embeddings.bin").u8string().c_str()),
@@ -251,13 +251,13 @@ auto ProcessorCore1::SetOutputGain(const double new_output_gain) -> ErrorCode {
   return ErrorCode::kSuccess;
 }
 
-auto ProcessorCore1::SetSpeakerMergeWeight(
-  int target_speaker_id, double merge_weight
+auto ProcessorCore1::SetSpeakerMorphingWeight(
+  int target_speaker_id, double morphing_weight
 ) -> ErrorCode {
   if( target_speaker_id < 0 || target_speaker_id >= n_speakers_ ){
     return ErrorCode::kSpeakerIDOutOfRange;
   }
-  speaker_merge_weights_[target_speaker_id] = merge_weight;
+  speaker_morphing_weights_[target_speaker_id] = morphing_weight;
   return ErrorCode::kSuccess;
 }
 

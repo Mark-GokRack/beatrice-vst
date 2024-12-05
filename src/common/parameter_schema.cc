@@ -49,27 +49,27 @@ const ParameterSchema kSchema = [] {
                                                   0.0);
              controller.updated_parameters_.push_back(
                  ParameterID::kFormantShift);
-             // MergedVoiceIndex
+             // Voice Morph Index
              
-             auto merged_voice_id = kMaxNSpeakers;
+             auto voice_morph_id = kMaxNSpeakers;
              for ( auto i = 0; i < kMaxNSpeakers; ++i ) {
                 const auto& voice = model_config.voices[i];
                 if (voice.name.empty() && voice.description.empty() &&
                     voice.portrait.path.empty() && voice.portrait.description.empty()) {
-                  merged_voice_id = i;
+                  voice_morph_id = i;
                   break;
                 }
              }
              
-             controller.parameter_state_.SetValue(ParameterID::kMergedVoiceIndex, (double)merged_voice_id);
-             controller.updated_parameters_.push_back(ParameterID::kMergedVoiceIndex);
-             if( merged_voice_id < kMaxNSpeakers ){
-              double average_merge_pitch = 0;
-              for (auto i = 0; i < merged_voice_id; ++i) {
-                average_merge_pitch += model_config.voices[i].average_pitch;
+             controller.parameter_state_.SetValue(ParameterID::kVoiceMorphIndex, (double)voice_morph_id);
+             controller.updated_parameters_.push_back(ParameterID::kVoiceMorphIndex);
+             if( voice_morph_id < kMaxNSpeakers ){
+              double morphed_average_pitch = 0;
+              for (auto i = 0; i < voice_morph_id; ++i) {
+                morphed_average_pitch += model_config.voices[i].average_pitch;
               }
-              average_merge_pitch /= merged_voice_id;
-              model_config.voices[merged_voice_id].average_pitch = average_merge_pitch;
+              morphed_average_pitch /= voice_morph_id;
+              model_config.voices[voice_morph_id].average_pitch = morphed_average_pitch;
              }
              // AverageTargetPitches
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
@@ -83,15 +83,15 @@ const ParameterSchema kSchema = [] {
                        static_cast<int>(ParameterID::kAverageTargetPitchBase) +
                        i));
              }
-             // kVoiceMergeWeights
+             // kVoiceMorphWeightss
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
                controller.parameter_state_.SetValue(
                    static_cast<ParameterID>(
-                       static_cast<int>(ParameterID::kVoiceMergeWeight) +
+                       static_cast<int>(ParameterID::kVoiceMorphWeights) +
                        i), 0.0);
                controller.updated_parameters_.push_back(
                    static_cast<ParameterID>(
-                       static_cast<int>(ParameterID::kVoiceMergeWeight) +
+                       static_cast<int>(ParameterID::kVoiceMorphWeights) +
                        i));
              }
    
@@ -337,9 +337,9 @@ const ParameterSchema kSchema = [] {
            [](ProcessorProxy& vc, const int value) {
              return vc.GetCore()->SetPitchCorrectionType(value);
            })},
-      {ParameterID::kMergedVoiceIndex,
+      {ParameterID::kVoiceMorphIndex,
         NumberParameter(
-            u8"MergedVoiceIndex"s, kMaxNSpeakers, 0.0, kMaxNSpeakers, u8""s, kMaxNSpeakers, u8"MrgID"s,
+            u8"VoiceMorphIndex"s, kMaxNSpeakers, 0.0, kMaxNSpeakers, u8""s, kMaxNSpeakers, u8"MrphID"s,
             parameter_flag::kIsReadOnly | parameter_flag::kIsHidden,
             [](ControllerCore&, double) { return ErrorCode::kSuccess; },
             [](ProcessorProxy&, double) { return ErrorCode::kSuccess; }
@@ -363,7 +363,7 @@ const ParameterSchema kSchema = [] {
     const auto i_u8 = std::u8string(i_ascii.begin(), i_ascii.end());
     schema.AddParameter(
         static_cast<ParameterID>(
-            static_cast<int>(ParameterID::kVoiceMergeWeight) + i),
+            static_cast<int>(ParameterID::kVoiceMorphWeights) + i),
         NumberParameter(
             u8"Voice "s + i_u8 + u8"'s Weight"s , 0.0, 0.0, 1.0, u8""s, 100, u8"VcWght"s,
             parameter_flag::kCanAutomate,
@@ -371,15 +371,15 @@ const ParameterSchema kSchema = [] {
               /*
               // マージの比率に応じて AverageTargetPitchBase も変える？
               // ここまでする必要ってあるのかな？
-              auto merged_voice_id = static_cast<int>( std::get<double>(
-                controller.parameter_state_.GetValue( ParameterID::kMergedVoiceIndex )) );
+              auto voice_morph_id = static_cast<int>( std::get<double>(
+                controller.parameter_state_.GetValue( ParameterID::kVoiceMorphIndex )) );
               double weighted_average_pitch = 0.0;
               double simple_average_pitch = 0.0;
               double sum_weights = 0.0;
-              for( auto i = 0; i < merged_voice_id; i++){
+              for( auto i = 0; i < voice_morph_id; i++){
                 auto weight = std::get<double>(
                   controller.parameter_state_.GetValue(static_cast<ParameterID>(
-                    static_cast<int>(ParameterID::kVoiceMergeWeight) + i)));
+                    static_cast<int>(ParameterID::kVoiceMorphWeights) + i)));
                 auto avg_pitch = std::get<double>(
                   controller.parameter_state_.GetValue(static_cast<ParameterID>(
                     static_cast<int>(ParameterID::kAverageTargetPitchBase) + i)));
@@ -390,10 +390,10 @@ const ParameterSchema kSchema = [] {
               if( sum_weights > 0 ){
                 weighted_average_pitch /= sum_weights;
               }else{
-                weighted_average_pitch = simple_average_pitch / merged_voice_id;
+                weighted_average_pitch = simple_average_pitch / voice_morph_id;
               }
               controller.parameter_state_.SetValue(static_cast<ParameterID>(
-                static_cast<int>(ParameterID::kAverageTargetPitchBase) + merged_voice_id),
+                static_cast<int>(ParameterID::kAverageTargetPitchBase) + voice_morph_id),
                 weighted_average_pitch);
               */
               return ErrorCode::kSuccess;
@@ -402,7 +402,7 @@ const ParameterSchema kSchema = [] {
             // キャプチャ付きのラムダ式を格納できなかった。
             // std::function を用いる定義に書き直すと格納できるようになる。
             [i](ProcessorProxy& vc, double value) { 
-              return vc.GetCore()->SetSpeakerMergeWeight( i, value );
+              return vc.GetCore()->SetSpeakerMorphingWeight( i, value );
             }
         ));
   }
@@ -411,7 +411,7 @@ const ParameterSchema kSchema = [] {
     const auto i_u8 = std::u8string(i_ascii.begin(), i_ascii.end());
     schema.AddParameter(
         static_cast<ParameterID>(
-            static_cast<int>(ParameterID::kVoiceMergeLabels) + i),
+            static_cast<int>(ParameterID::kVoiceMorphLabels) + i),
         StringParameter(
             u8"Voice "s + i_u8 + u8"'s Weight"s,
             u8""s, true,

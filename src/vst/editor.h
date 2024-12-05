@@ -78,7 +78,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto MakeFileSelector(Context&, ParamID param_id) -> CView*;
   auto MakePortraitView(Context&) -> CView*;
   auto MakeModelVoiceDescription(Context&) -> CView*;
-  auto MakeVoiceMergeView(Context&) -> CView*;
+  auto MakeVoiceMorphingView(Context&) -> CView*;
 
   std::map<ParamID, CControl*> controls_;
   CFontRef font_, font_bold_;
@@ -87,7 +87,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   CView* portrait_view_;
   ModelVoiceDescription model_voice_description_;
 
-  VSTGUI::CScrollView* merge_weight_view_;
+  VSTGUI::CScrollView* morphing_weights_view_;
 
   std::map<std::u8string, SharedPointer<CBitmap>> portraits_;
 };

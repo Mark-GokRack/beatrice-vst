@@ -55,7 +55,7 @@ Editor::Editor(void* const controller)
       font_(new CFontDesc(kNormalFont->getName(), 14)),
       font_bold_(new CFontDesc(kNormalFont->getName(), 14, kBoldFace)),
       portrait_view_(),
-      merge_weight_view_() {
+      morphing_weights_view_() {
   setRect(ViewRect(0, 0, kWindowWidth, kWindowHeight));
 }
 
@@ -133,8 +133,8 @@ auto PLUGIN_API Editor::open(void* const parent,
   MakeSlider(context, static_cast<ParamID>(ParameterID::kFormantShift), 2);
   EndGroup(context);
   
-  BeginGroup(context, u8"Voice Merge");
-  MakeVoiceMergeView(context);
+  BeginGroup(context, u8"Voice Morphing");
+  MakeVoiceMorphingView(context);
   EndGroup(context);  
 
   EndColumn(context);
@@ -165,7 +165,7 @@ void PLUGIN_API Editor::close() {
     frame = nullptr;
     portraits_.clear();
     portrait_view_ = nullptr;
-    merge_weight_view_ = nullptr;
+    morphing_weights_view_ = nullptr;
   }
 }
 
@@ -266,7 +266,7 @@ void Editor::SyncModelDescription() {
           voice.portrait.path.empty() && voice.portrait.description.empty()) {
         if( isFirstEmpty ){
           isFirstEmpty = false;
-          voice_combobox->addEntry("Voice Merge Mode");
+          voice_combobox->addEntry("Voice Morphing Mode");
           goto load_portrait_failed;
         }
         break;
@@ -327,10 +327,10 @@ void Editor::SyncModelDescription() {
     for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
       auto* const slider = static_cast<Slider*>(
           controls_.at(static_cast<ParamID>(
-            static_cast<int>( ParameterID::kVoiceMergeWeight ) + i )) );
+            static_cast<int>( ParameterID::kVoiceMorphWeights ) + i )) );
       auto* const label = static_cast<CTextLabel*>(
           controls_.at(static_cast<ParamID>(
-            static_cast<int>(ParameterID::kVoiceMergeLabels) + i )));
+            static_cast<int>(ParameterID::kVoiceMorphLabels) + i )));
       if( i < voice_counter ){
         slider->setVisible(true);
         label->setVisible(true);
@@ -357,16 +357,16 @@ void Editor::SyncModelDescription() {
     model_voice_description_.SetVoiceDescription(voice.description);
     model_voice_description_.SetPortraitDescription(voice.portrait.description);
 
-    merge_weight_view_->setContainerSize(
+    morphing_weights_view_->setContainerSize(
       CRect(0, 0, kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ), 
         voice_counter * ( kElementHeight + kElementMerginY ) )
     );
     if( voice_id == voice_counter){
-      merge_weight_view_->setVisible(true);
+      morphing_weights_view_->setVisible(true);
     }else{
-      merge_weight_view_->setVisible(false);
+      morphing_weights_view_->setVisible(false);
     }
-    merge_weight_view_->setDirty();
+    morphing_weights_view_->setDirty();
     if (auto* const column_view =
             model_voice_description_.model_description_->getParentView()) {
       column_view->setDirty();
@@ -418,9 +418,9 @@ void Editor::valueChanged(CControl* const pControl) {
     const auto plain_value = static_cast<int>(control->getValue());
     if( vst_param_id == static_cast<int>(ParameterID::kVoice)){
       if( plain_value == static_cast<int>(control->getMax()) && plain_value < common::kMaxNSpeakers-1 ){
-        merge_weight_view_->setVisible(true);
+        morphing_weights_view_->setVisible(true);
       }else{
-        merge_weight_view_->setVisible(false);
+        morphing_weights_view_->setVisible(false);
       }
     }
     if (plain_value ==
@@ -752,7 +752,7 @@ auto Editor::MakeModelVoiceDescription(Context& context) -> CView* {
   return nullptr;
 }
 
-auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
+auto Editor::MakeVoiceMorphingView(Context& context) -> CView* {
   context.y += std::max(context.last_element_mergin, 24);
   //const auto button_width = ( kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementMerginX ) / 2;
 
@@ -761,13 +761,13 @@ auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
           kWindowHeight- kFooterHeight - kHeaderHeight - context.y ).offset( context.x, context.y );
   const auto container_size = CRect(0, 0,
           size.getWidth(), ( kElementHeight + kElementMerginY ) * common::kMaxNSpeakers );
-  merge_weight_view_ = new VSTGUI::CScrollView(
+  morphing_weights_view_ = new VSTGUI::CScrollView(
     size, container_size,
     VSTGUI::CScrollView::kVerticalScrollbar | VSTGUI::CScrollView::kDontDrawFrame
     | VSTGUI::CScrollView::kOverlayScrollbars | VSTGUI::CScrollView::kAutoHideScrollbars
   );
-  merge_weight_view_->setAutosizeFlags( VSTGUI::kAutosizeRow | VSTGUI::kAutosizeBottom );
-  merge_weight_view_->setBackgroundColor(kTransparentCColor);
+  morphing_weights_view_->setAutosizeFlags( VSTGUI::kAutosizeRow | VSTGUI::kAutosizeBottom );
+  morphing_weights_view_->setBackgroundColor(kTransparentCColor);
   
   static constexpr auto kHandleWidth = 10;  // 透明の左右の淵を含む
   auto* const slider_bmp =
@@ -778,7 +778,7 @@ auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
                          kDarkColorScheme.secondary_dim, kTransparentCColor);
 
   for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
-    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMergeLabels) + i;
+    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMorphLabels) + i;
     auto const param_id = static_cast<ParameterID>(vst_param_id);
     const auto param =
         std::get<common::StringParameter>(common::kSchema.GetParameter(param_id));
@@ -794,18 +794,18 @@ auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
     label_control->setHoriAlign(CHoriTxtAlign::kCenterText);
     label_control->setVisible(false);
 
-    merge_weight_view_->addView( label_control );
+    morphing_weights_view_->addView( label_control );
     controls_.insert({vst_param_id, label_control});
   }
   for( auto i = 0; i < common::kMaxNSpeakers; i++ ){
-    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMergeWeight) + i;
+    auto const vst_param_id = static_cast<int>(ParameterID::kVoiceMorphWeights) + i;
     auto const param_id = static_cast<ParamID>(vst_param_id);
     auto* const param =
         static_cast<LinearParameter*>(controller->getParameterObject(param_id));
     const auto slider_offset_x = kLabelWidth + kElementMerginX;
-    const auto slider_width = kElementWidth - merge_weight_view_->getScrollbarWidth();
+    const auto slider_width = kElementWidth - morphing_weights_view_->getScrollbarWidth();
     auto* const slider_control = new Slider(
-        CRect(0, 0, kElementWidth - merge_weight_view_->getScrollbarWidth(), kElementHeight)
+        CRect(0, 0, kElementWidth - morphing_weights_view_->getScrollbarWidth(), kElementHeight)
         .offset( slider_offset_x, i * ( kElementHeight + kElementMerginY ) ),
         this, static_cast<int>(param_id), slider_offset_x,
         slider_offset_x + slider_width - kHandleWidth, handle_bmp, slider_bmp,
@@ -814,17 +814,17 @@ auto Editor::MakeVoiceMergeView(Context& context) -> CView* {
         static_cast<float>(param->getNormalized()));
     slider_control->setVisible(false);
 
-    merge_weight_view_->addView( slider_control );
+    morphing_weights_view_->addView( slider_control );
     controls_.insert({vst_param_id, slider_control});
   }
 
   slider_bmp->forget();
   handle_bmp->forget();
 
-  merge_weight_view_->setVisible(false);
+  morphing_weights_view_->setVisible(false);
 
-  context.column_elements.push_back( merge_weight_view_ );
-  return merge_weight_view_;
+  context.column_elements.push_back( morphing_weights_view_ );
+  return morphing_weights_view_;
 }
 
 

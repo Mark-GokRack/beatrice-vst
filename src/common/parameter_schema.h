@@ -54,10 +54,10 @@ enum class ParameterID : int {
   kPitchCorrection = 10,
   kPitchCorrectionType = 11,
   kAverageTargetPitchBase = 100,
-  kMergedVoiceIndex = kAverageTargetPitchBase + kMaxNSpeakers,
-  kVoiceMergeWeight = kMergedVoiceIndex + 1,
-  kVoiceMergeLabels = kVoiceMergeWeight + kMaxNSpeakers,
-  kSentinel = kVoiceMergeLabels + kMaxNSpeakers,
+  kVoiceMorphIndex = kAverageTargetPitchBase + kMaxNSpeakers,
+  kVoiceMorphWeights = kVoiceMorphIndex + 1,
+  kVoiceMorphLabels = kVoiceMorphWeights + kMaxNSpeakers,
+  kSentinel = kVoiceMorphLabels + kMaxNSpeakers,
 };
 
 class NumberParameter {
