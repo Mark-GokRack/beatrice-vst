@@ -11,6 +11,7 @@
 #include "vst3sdk/public.sdk/source/vst/vstguieditor.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cview.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cscrollview.h"
+#include "vst3sdk/vstgui4/vstgui/lib/ctabview.h"
 
 // Beatrice
 #include "common/model_config.h"
@@ -54,8 +55,8 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kElementMerginY = 8;
   static constexpr auto kElementMerginX = 8;
   static constexpr auto kLabelWidth = kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementWidth - kElementMerginX;
-  static constexpr auto kModelInfoColumnWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX );
-  static constexpr auto kPortraitWidth = kModelInfoColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX + kElementMerginX );
+  static constexpr auto kPortraitColumnWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX );
+  static constexpr auto kPortraitWidth = kPortraitColumnWidth;
   static constexpr auto kPortraitHeight = kPortraitWidth;
   struct Context {
     int y = kHeaderHeight + kColumnMerginY;
@@ -76,17 +77,25 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto MakeSlider(Context&, ParamID param_id, int precision = 1) -> CView*;
   auto MakeCombobox(Context&, ParamID, const CColor&, const CColor&) -> CView*;
   auto MakeFileSelector(Context&, ParamID param_id) -> CView*;
-  auto MakePortraitView(Context&) -> CView*;
   auto MakeModelVoiceDescription(Context&) -> CView*;
+
+  static void BeginTabColumn(Context&, int width, const CColor& back_color);
+  auto EndTabColumn(Context&) -> CView*;
+  auto MakePortraitViewAndDescription(Context&) -> CView*;
   auto MakeVoiceMorphingView(Context&) -> CView*;
 
   std::map<ParamID, CControl*> controls_;
   CFontRef font_, font_bold_;
   std::optional<common::ModelConfig> model_config_;
 
-  CView* portrait_view_;
   ModelVoiceDescription model_voice_description_;
 
+  VSTGUI::CTabView* tab_view_;
+
+  CView* portrait_picture_view_;
+  CMultiLineTextLabel* portrait_description_;
+
+  std::vector<CTextLabel*> morphing_labels_;
   VSTGUI::CScrollView* morphing_weights_view_;
 
   std::map<std::u8string, SharedPointer<CBitmap>> portraits_;
