@@ -266,16 +266,14 @@ class ModelVoiceDescription {
  public:
   ModelVoiceDescription() = default;
   ModelVoiceDescription(const CRect& area, CFontRef font,
-                        const int element_height, const int element_mergin_y )
+                        const int element_height, const int element_mergin_y)
       : area_(area),
         element_height_(element_height),
         element_mergin_y_(element_mergin_y),
         model_description_label_(),
         voice_description_label_(),
-        portrait_description_label_(),
         model_description_(),
-        voice_description_(),
-        portrait_description_() {
+        voice_description_() {
     auto y = area.top;
     model_description_label_ =
         new CTextLabel(CRect(area.left, y, area.right, y + element_height),
@@ -317,27 +315,6 @@ class ModelVoiceDescription {
     voice_description_->setStyle(CParamDisplay::kNoFrame);
     voice_description_->setLineLayout(CMultiLineTextLabel::LineLayout::wrap);
     voice_description_->setTextInset(CPoint(0, 2));
-    y += voice_description_->getHeight() + element_mergin_y;
-
-    portrait_description_label_ =
-        new CTextLabel(CRect(area.left, y, area.right, y + element_height),
-                       "Portrait Description", nullptr, CParamDisplay::kNoFrame);
-    portrait_description_label_->setFont(font);
-    portrait_description_label_->setFontColor(kDarkColorScheme.on_surface);
-    portrait_description_label_->setHoriAlign(CHoriTxtAlign::kLeftText);
-    portrait_description_label_->setBackColor(kTransparentCColor);
-    y += element_height + element_mergin_y;
-
-    portrait_description_ =
-        new CMultiLineTextLabel(CRect(area.left, y, area.right, area.bottom));
-    portrait_description_->setFont(font);
-    portrait_description_->setFontColor(kDarkColorScheme.on_surface);
-    portrait_description_->setHoriAlign(CHoriTxtAlign::kLeftText);
-    portrait_description_->setBackColor(kTransparentCColor);
-    portrait_description_->setAutoHeight(true);
-    portrait_description_->setStyle(CParamDisplay::kNoFrame);
-    portrait_description_->setLineLayout(CMultiLineTextLabel::LineLayout::wrap);
-    portrait_description_->setTextInset(CPoint(0, 2));
 
     AdjustVoiceDescriptionPosition();
   }
@@ -367,21 +344,7 @@ class ModelVoiceDescription {
       voice_description_->setVisible(true);
       voice_description_label_->setVisible(true);
     }
-    AdjustVoiceDescriptionPosition();
-  }
-
-  void SetPortraitDescription(const std::u8string& description) const {
-    if (description.empty()) {
-      portrait_description_->setText(nullptr);
-      portrait_description_->setVisible(false);
-      portrait_description_label_->setVisible(false);
-    } else {
-      portrait_description_->setText(
-          reinterpret_cast<const char*>(description.c_str()));
-      portrait_description_->setVisible(true);
-      portrait_description_label_->setVisible(true);
-    }
-    AdjustVoiceDescriptionPosition();
+    Invalid();
   }
 
   void Invalid() const {
@@ -396,10 +359,8 @@ class ModelVoiceDescription {
   int element_mergin_y_;
   CTextLabel* model_description_label_;
   CTextLabel* voice_description_label_;
-  CTextLabel* portrait_description_label_;
   CMultiLineTextLabel* model_description_;
   CMultiLineTextLabel* voice_description_;
-  CMultiLineTextLabel* portrait_description_;
   friend class Editor;
 
   void AdjustVoiceDescriptionPosition() const {
@@ -407,29 +368,11 @@ class ModelVoiceDescription {
         model_description_->getText() == nullptr
             ? area_.top
             : model_description_->getViewSize().bottom + element_mergin_y_ + 4;
-
     voice_description_label_->setViewSize(
         CRect(area_.left, y, area_.right, y + element_height_));
-    y += element_height_ + element_mergin_y_ + 4;
-
-    if (voice_description_->getText() != nullptr ){
-      auto height = voice_description_->getViewSize().getHeight();
-      voice_description_->setViewSize(
-        CRect(area_.left, y, area_.right, y + height ) );
-      y += height + element_mergin_y_ + 4;
-    }
-      
-    portrait_description_label_->setViewSize(
-        CRect(area_.left, y, area_.right, y + element_height_));
-    y += element_height_ + element_mergin_y_ + 4;
-
-    if (portrait_description_->getText() != nullptr ){
-      auto height = portrait_description_->getViewSize().getHeight();
-      portrait_description_->setViewSize(
-        CRect(area_.left, y, area_.right, y + height ) );
-      y += height + element_mergin_y_ + 4;
-    }
-      
+    y += element_height_ + element_mergin_y_;
+    voice_description_->setViewSize(
+        CRect(area_.left, y, area_.right, area_.bottom));
     Invalid();
   }
 };

@@ -19,7 +19,7 @@
 
 namespace beatrice::vst {
 
-static constexpr auto kWindowWidth = 1200;
+static constexpr auto kWindowWidth = 1280;
 static constexpr auto kWindowHeight = 720;
 
 class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
@@ -45,12 +45,12 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kFooterHeight = 32;
   static constexpr auto kColumnMerginY = 0;
   static constexpr auto kColumnMerginX = 1;
-  static constexpr auto kColumnWidth = 420 - kColumnMerginX;
+  static constexpr auto kColumnWidth = 400 - kColumnMerginX;
   static constexpr auto kInnerColumnMerginY = 12;
   static constexpr auto kInnerColumnMerginX = 12;
   static constexpr auto kGroupLabelMerginY = 12;
   static constexpr auto kGroupIndentX = 4;
-  static constexpr auto kElementWidth = 244;
+  static constexpr auto kElementWidth = 224;
   static constexpr auto kElementHeight = 24;
   static constexpr auto kElementMerginY = 8;
   static constexpr auto kElementMerginX = 8;

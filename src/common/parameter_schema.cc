@@ -49,6 +49,7 @@ const ParameterSchema kSchema = [] {
                                                   0.0);
              controller.updated_parameters_.push_back(
                  ParameterID::kFormantShift);
+
              // AverageTargetPitches
              for (auto i = 0; i < kMaxNSpeakers; ++i) {
                controller.parameter_state_.SetValue(

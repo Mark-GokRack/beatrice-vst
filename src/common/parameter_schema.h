@@ -9,7 +9,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
 #include <functional>
 
 #include "common/error.h"
