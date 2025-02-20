@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_VST_EDITOR_H_
 #define BEATRICE_VST_EDITOR_H_
@@ -9,9 +9,9 @@
 
 #include "vst3sdk/pluginterfaces/vst/vsttypes.h"
 #include "vst3sdk/public.sdk/source/vst/vstguieditor.h"
-#include "vst3sdk/vstgui4/vstgui/lib/cview.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cscrollview.h"
 #include "vst3sdk/vstgui4/vstgui/lib/ctabview.h"
+#include "vst3sdk/vstgui4/vstgui/lib/cview.h"
 
 // Beatrice
 #include "common/model_config.h"
@@ -31,8 +31,8 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
  public:
   explicit Editor(void* controller);
   ~Editor() SMTG_OVERRIDE;
-  auto PLUGIN_API open(void* parent,
-                       const PlatformType& platformType) -> bool SMTG_OVERRIDE;
+  auto PLUGIN_API open(void* parent, const PlatformType& platformType)
+      -> bool SMTG_OVERRIDE;
   void PLUGIN_API close() SMTG_OVERRIDE;
   void SyncValue(ParamID param_id, ParamValue value);
   void SyncStringValue(ParamID param_id, const std::u8string& value);
@@ -54,8 +54,11 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static constexpr auto kElementHeight = 24;
   static constexpr auto kElementMerginY = 8;
   static constexpr auto kElementMerginX = 8;
-  static constexpr auto kLabelWidth = kColumnWidth - 2 * ( kInnerColumnMerginX + kGroupIndentX ) - kElementWidth - kElementMerginX;
-  static constexpr auto kPortraitColumnWidth = kWindowWidth - 2 * ( kColumnWidth + kColumnMerginX );
+  static constexpr auto kLabelWidth =
+      kColumnWidth - 2 * (kInnerColumnMerginX + kGroupIndentX) - kElementWidth -
+      kElementMerginX;
+  static constexpr auto kPortraitColumnWidth =
+      kWindowWidth - 2 * (kColumnWidth + kColumnMerginX);
   static constexpr auto kPortraitWidth = kPortraitColumnWidth;
   static constexpr auto kPortraitHeight = kPortraitWidth;
   struct Context {
@@ -83,21 +86,22 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   static void BeginTabColumn(Context&, int width, const CColor& back_color);
   auto EndTabColumn(Context&) -> CView*;
   auto MakeVoiceMorphingView(Context&) -> CView*;
+  void SyncVoiceMorphingDescription();
 
   std::map<ParamID, CControl*> controls_;
   CFontRef font_, font_bold_;
   std::optional<common::ModelConfig> model_config_;
 
-  ModelVoiceDescription model_voice_description_;
+  ModelVoiceDescription* model_voice_description_;
 
   VSTGUI::CTabView* tab_view_;
 
-  CView* portraig_view_;
+  CView* portrait_view_;
   CMultiLineTextLabel* portrait_description_;
 
   std::map<std::u8string, SharedPointer<CBitmap>> portraits_;
 
-  std::vector<CTextLabel*> morphing_labels_;
+  std::array<CTextLabel*, common::kMaxNSpeakers> morphing_labels_;
   VSTGUI::CScrollView* morphing_weights_view_;
 };
 

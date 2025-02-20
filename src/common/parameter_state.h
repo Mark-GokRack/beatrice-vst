@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_PARAMETER_STATE_H_
 #define BEATRICE_COMMON_PARAMETER_STATE_H_
@@ -27,13 +27,13 @@ class ParameterState {
 
   void SetDefaultValues(const ParameterSchema& schema);
   template <typename T>
-  inline void SetValue(const ParameterID param_id, const T value)
+  void SetValue(const ParameterID param_id, const T value)
     requires(sizeof(T) <= 8)
   {  // NOLINT(whitespace/braces)
     states_.insert_or_assign(param_id, value);
   }
   template <typename T>
-  inline void SetValue(const ParameterID param_id, const T& value)
+  void SetValue(const ParameterID param_id, const T& value)
     requires(sizeof(T) > 8)
   {  // NOLINT(whitespace/braces)
     states_.insert_or_assign(param_id, std::make_unique<T>(value));
@@ -41,8 +41,8 @@ class ParameterState {
   [[nodiscard]] auto GetValue(ParameterID param_id) const
       -> const ParameterState::Value&;
   auto Read(std::istream& is) -> ErrorCode;
-  auto ReadOrSetDefault(std::istream& is,
-                        const ParameterSchema& schema) -> ErrorCode;
+  auto ReadOrSetDefault(std::istream& is, const ParameterSchema& schema)
+      -> ErrorCode;
   auto Write(std::ostream& os) const -> ErrorCode;
 
  private:

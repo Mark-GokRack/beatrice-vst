@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #include "vst/parameter.h"
 
@@ -33,7 +33,7 @@ LinearParameter::LinearParameter(const TChar* title, ParamID tag,
 
   info.stepCount = divisions;
   info.defaultNormalizedValue = valueNormalized =
-      toNormalized(defaultValuePlain);
+      LinearParameter::toNormalized(defaultValuePlain);
   info.flags = flags;
   info.id = tag;
   info.unitId = unitID;

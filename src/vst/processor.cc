@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #include "vst/processor.h"
 
@@ -209,7 +209,7 @@ auto PLUGIN_API Processor::process(ProcessData& data) -> tresult {
     data.outputs[0].silenceFlags = 1U;
   } else {
     // VC
-    const auto error_code =
+    [[maybe_unused]] const auto error_code =
         vc_core_.GetCore()->Process(out0, out0, data.numSamples);
     // TODO(bug): error_code に基づいてサイレンスフラグを立てる
   }
@@ -223,7 +223,9 @@ auto PLUGIN_API Processor::process(ProcessData& data) -> tresult {
   return kResultOk;
 }
 
-// プリセット / プロジェクトをロードした時に呼ばれる
+// プロジェクトやプリセットをロードした時に呼ばれる。
+// kResultFalse を返した場合、StudioRack などでは
+// Controller::setComponentState が呼ばれなくなるため注意が必要。
 auto PLUGIN_API Processor::setState(IBStream* const state) -> tresult {
   std::lock_guard<std::mutex> lock(mtx_);
   int siz;

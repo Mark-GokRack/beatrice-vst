@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_VST_CONTROLLER_H_
 #define BEATRICE_VST_CONTROLLER_H_
@@ -42,8 +42,8 @@ class Controller : public Steinberg::Vst::EditController {
 
   void editorDestroyed(EditorView* editorView) SMTG_OVERRIDE;
 
-  auto PLUGIN_API setParamNormalized(ParamID param_id,
-                                     ParamValue value) -> tresult SMTG_OVERRIDE;
+  auto PLUGIN_API setParamNormalized(ParamID param_id, ParamValue value)
+      -> tresult SMTG_OVERRIDE;
 
  private:
   common::ControllerCore core_;

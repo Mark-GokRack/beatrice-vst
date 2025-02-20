@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #include "common/parameter_state.h"
 
@@ -10,12 +10,14 @@ namespace beatrice::common {
 ParameterState::ParameterState(const ParameterState& rhs) {
   for (const auto& [param_id, value] : rhs.states_) {
     std::visit(
-        [&](const auto& value) {
+        [this, param_id](const auto& value) {
           using T = std::decay_t<decltype(value)>;
           if constexpr (std::is_same_v<T, int> || std::is_same_v<T, double>) {
+            // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
             SetValue(param_id, value);
           } else if constexpr (std::is_same_v<T,  // NOLINT(readability/braces)
                                               std::unique_ptr<std::u8string>>) {
+            // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
             SetValue(param_id, *value);
           } else {
             assert(false);
@@ -29,12 +31,14 @@ auto ParameterState::operator=(const ParameterState& rhs) -> ParameterState& {
   states_.clear();
   for (const auto& [param_id, value] : rhs.states_) {
     std::visit(
-        [&](const auto& value) {
+        [this, param_id](const auto& value) {
           using T = std::decay_t<decltype(value)>;
           if constexpr (std::is_same_v<T, int> || std::is_same_v<T, double>) {
+            // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
             SetValue(param_id, value);
           } else if constexpr (std::is_same_v<T,  // NOLINT(readability/braces)
                                               std::unique_ptr<std::u8string>>) {
+            // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
             SetValue(param_id, *value);
           } else {
             assert(false);
@@ -48,7 +52,8 @@ auto ParameterState::operator=(const ParameterState& rhs) -> ParameterState& {
 void ParameterState::SetDefaultValues(const ParameterSchema& schema) {
   for (const auto& [param_id, param] : schema) {
     std::visit(
-        [&, this](const auto& param) {
+        [this, param_id](const auto& param) {
+          // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
           SetValue(param_id, param.GetDefaultValue());
         },
         param);
@@ -111,8 +116,9 @@ auto ParameterState::Read(std::istream& is) -> ErrorCode {
   }
 }
 
-auto ParameterState::ReadOrSetDefault(
-    std::istream& is, const ParameterSchema& schema) -> ErrorCode {
+auto ParameterState::ReadOrSetDefault(std::istream& is,
+                                      const ParameterSchema& schema)
+    -> ErrorCode {
   states_.clear();
   SetDefaultValues(schema);
   return Read(is);

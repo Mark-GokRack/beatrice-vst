@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_CONTROLLER_CORE_H_
 #define BEATRICE_COMMON_CONTROLLER_CORE_H_
@@ -15,10 +15,7 @@ class ControllerCore {
   ParameterState parameter_state_;
   std::vector<ParameterID> updated_parameters_;
 
-  inline auto Read(std::istream& is) -> ErrorCode {
-    return parameter_state_.ReadOrSetDefault(is, kSchema);
-  }
-  inline void SetDefaultValues() { parameter_state_.SetDefaultValues(kSchema); }
+  ControllerCore() { parameter_state_.SetDefaultValues(kSchema); }
 };
 }  // namespace beatrice::common
 

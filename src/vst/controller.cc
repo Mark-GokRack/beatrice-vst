@@ -1,9 +1,12 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #include "vst/controller.h"
 
+#include <algorithm>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <variant>
 
 #include "vst3sdk/pluginterfaces/base/funknown.h"
 #include "vst3sdk/pluginterfaces/vst/ivstunits.h"
@@ -11,6 +14,7 @@
 #include "vst3sdk/public.sdk/source/vst/vstparameters.h"
 
 // Beatrice
+#include "common/parameter_schema.h"
 #include "vst/parameter.h"
 
 namespace beatrice::vst {
@@ -91,23 +95,28 @@ auto PLUGIN_API Controller::setComponentState(IBStream* const state)
     return kResultFalse;
   }
   auto iss = std::istringstream(state_string, std::ios::binary);
-  if (core_.Read(iss) != common::ErrorCode::kSuccess) {
+  common::ParameterState tmp_parameter_state;
+  if (tmp_parameter_state.ReadOrSetDefault(iss, common::kSchema) !=
+      common::ErrorCode::kSuccess) {
     return kResultFalse;
   }
   for (const auto& [param_id, param] : common::kSchema) {
     const auto vst_param_id = static_cast<ParamID>(param_id);
-    const auto& value = core_.parameter_state_.GetValue(param_id);
+    const auto& value = tmp_parameter_state.GetValue(param_id);
     if (const auto* const num_param =
             std::get_if<common::NumberParameter>(&param)) {
       const auto normalized_value =
-          plainParamToNormalized(vst_param_id, std::get<double>(value));
-      EditController::setParamNormalized(vst_param_id, normalized_value);
+          Normalize(*num_param, std::get<double>(value));
+      setParamNormalized(vst_param_id, normalized_value);
     } else if (const auto* const list_param =
                    std::get_if<common::ListParameter>(&param)) {
-      const auto normalized_value = plainParamToNormalized(
-          vst_param_id, static_cast<double>(std::get<int>(value)));
-      EditController::setParamNormalized(vst_param_id, normalized_value);
+      const auto normalized_value =
+          Normalize(*list_param, std::get<int>(value));
+      setParamNormalized(vst_param_id, normalized_value);
     } else if (std::get_if<common::StringParameter>(&param)) {
+      const auto error_code = SetStringParameter(
+          vst_param_id, *std::get<std::unique_ptr<std::u8string>>(value));
+      assert(error_code == common::ErrorCode::kSuccess);
     } else {
       assert(false);
     }
@@ -119,7 +128,6 @@ auto PLUGIN_API Controller::setComponentState(IBStream* const state)
 auto PLUGIN_API Controller::createView(const char* const name) -> IPlugView* {
   if (strcmp(name, "editor") == 0) {
     auto* const editor = new Editor(this);
-    editor->remember();
     editors_.push_back(editor);
     return editor;
   }
@@ -127,11 +135,10 @@ auto PLUGIN_API Controller::createView(const char* const name) -> IPlugView* {
 }
 
 void Controller::editorDestroyed(EditorView* const editor) {
-  const auto itr = std::find(editors_.begin(), editors_.end(), editor);
+  const auto itr = std::ranges::find(editors_, editor);
   if (itr == editors_.end()) {
     return;
   }
-  (*itr)->forget();
   *itr = editors_.back();
   editors_.pop_back();
 }
@@ -172,7 +179,9 @@ auto PLUGIN_API Controller::setParamNormalized(
   return kResultTrue;
 }
 
-// GUI 側から呼ばれて StringParameter の変更を反映させる
+// setParamNormalized の文字列パラメータ版で、Editor から呼ばれる他、
+// Host 側からも初期化時やプリセットロード時に
+// setComponentState を通して呼ばれる
 auto Controller::SetStringParameter(const ParamID vst_param_id,
                                     const std::u8string& value)
     -> common::ErrorCode {
@@ -180,15 +189,6 @@ auto Controller::SetStringParameter(const ParamID vst_param_id,
   const auto param =
       std::get<common::StringParameter>(common::kSchema.GetParameter(param_id));
   core_.parameter_state_.SetValue(param_id, value);
-
-  // processor に通知
-  auto* const msg = allocateMessage();
-  msg->setMessageID("param_change");
-  msg->getAttributes()->setBinary("param_id", &vst_param_id,
-                                  sizeof(vst_param_id));
-  msg->getAttributes()->setBinary("data", value.c_str(), value.size());
-  sendMessage(msg);
-  msg->release();
 
   for (auto&& editor : editors_) {
     editor->SyncStringValue(vst_param_id, value);

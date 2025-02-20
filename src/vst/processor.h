@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_VST_PROCESSOR_H_
 #define BEATRICE_VST_PROCESSOR_H_
@@ -35,8 +35,8 @@ class Processor : public Steinberg::Vst::AudioEffect {
 
   auto PLUGIN_API initialize(FUnknown* context) -> tresult SMTG_OVERRIDE;
   auto PLUGIN_API setBusArrangements(SpeakerArrangement* inputs, int32 numIns,
-                                     SpeakerArrangement* outputs,
-                                     int32 numOuts) -> tresult SMTG_OVERRIDE;
+                                     SpeakerArrangement* outputs, int32 numOuts)
+      -> tresult SMTG_OVERRIDE;
 
   auto PLUGIN_API setupProcessing(ProcessSetup& setup) -> tresult SMTG_OVERRIDE;
   auto PLUGIN_API setActive(TBool state) -> tresult SMTG_OVERRIDE;

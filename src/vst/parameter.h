@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_VST_PARAMETER_H_
 #define BEATRICE_VST_PARAMETER_H_
@@ -29,8 +29,8 @@ inline auto Normalize(const common::NumberParameter& param,
   return normalized;
 }
 
-inline auto Normalize(const common::ListParameter& param,
-                      const int plain_value) -> double {
+inline auto Normalize(const common::ListParameter& param, const int plain_value)
+    -> double {
   return static_cast<double>(std::clamp(plain_value, 0, param.GetDivisions())) /
          static_cast<double>(param.GetDivisions());
 }

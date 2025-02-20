@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_PROCESSOR_CORE_H_
 #define BEATRICE_COMMON_PROCESSOR_CORE_H_
@@ -21,8 +21,8 @@ class ProcessorCoreBase {
  public:
   virtual ~ProcessorCoreBase() = default;
   [[nodiscard]] virtual auto GetVersion() const -> int = 0;
-  virtual auto Process(const float* input, float* output,
-                       int n_samples) -> ErrorCode = 0;
+  virtual auto Process(const float* input, float* output, int n_samples)
+      -> ErrorCode = 0;
   virtual auto ResetContext() -> ErrorCode { return ErrorCode::kSuccess; }
   virtual auto LoadModel(const ModelConfig& /*config*/,
                          const std::filesystem::path& /*file*/) -> ErrorCode {
@@ -53,6 +53,7 @@ class ProcessorCoreBase {
   virtual auto SetAverageSourcePitch(double /*average_pitch*/) -> ErrorCode {
     return ErrorCode::kSuccess;
   }
+  // NOLINTNEXTLINE(readability/casting)
   virtual auto SetIntonationIntensity(double /*intonation_intensity*/)
       -> ErrorCode {
     return ErrorCode::kSuccess;
@@ -60,14 +61,18 @@ class ProcessorCoreBase {
   virtual auto SetPitchCorrection(double /*pitch_correction*/) -> ErrorCode {
     return ErrorCode::kSuccess;
   }
+  // NOLINTNEXTLINE(readability/casting)
   virtual auto SetPitchCorrectionType(int /*pitch_correction_type*/)
       -> ErrorCode {
     return ErrorCode::kSuccess;
   }
 
-  virtual auto SetSpeakerMorphingWeight(
-    int /*target_speaker*/, double /*morphing weight*/
-  ) -> ErrorCode { return ErrorCode::kSuccess; }
+  virtual auto SetSpeakerMorphingWeight(int /*target_speaker*/,
+                                        double /*morphing weight*/
+                                        )      // NOLINT(whitespace/parens)
+      -> ErrorCode {
+    return ErrorCode::kSuccess;
+  }
 
   friend class ProcessorProxy;
 };
@@ -76,9 +81,9 @@ class ProcessorCoreBase {
 class ProcessorCoreUnloaded : public ProcessorCoreBase {
  public:
   using ProcessorCoreBase::ProcessorCoreBase;
-  [[nodiscard]] inline auto GetVersion() const -> int override { return -1; }
-  inline auto Process(const float* const /*input*/, float* const output,
-                      const int n_samples) -> ErrorCode override {
+  [[nodiscard]] auto GetVersion() const -> int override { return -1; }
+  auto Process(const float* const /*input*/, float* const output,
+               const int n_samples) -> ErrorCode override {
     std::memset(output, 0, sizeof(float) * n_samples);
     return ErrorCode::kSuccess;
   }

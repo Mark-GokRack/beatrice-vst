@@ -1,8 +1,10 @@
-// Copyright (c) 2024 Project Beatrice
+// Copyright (c) 2024-2025 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_PROCESSOR_CORE_0_H_
 #define BEATRICE_COMMON_PROCESSOR_CORE_0_H_
 
+#include <array>
+#include <filesystem>
 #include <vector>
 
 #include "beatricelib/beatrice.h"
@@ -20,7 +22,7 @@ namespace beatrice::common {
 // 2.0.0-alpha.2 用の信号処理クラス
 class ProcessorCore0 : public ProcessorCoreBase {
  public:
-  inline explicit ProcessorCore0(const double sample_rate)
+  explicit ProcessorCore0(const double sample_rate)
       : ProcessorCoreBase(),
         any_freq_in_out_(sample_rate),
         phone_extractor_(Beatrice20a2_CreatePhoneExtractor()),
@@ -32,8 +34,8 @@ class ProcessorCore0 : public ProcessorCoreBase {
         waveform_context_(Beatrice20a2_CreateWaveformContext1()),
         input_gain_context_(sample_rate),
         output_gain_context_(sample_rate),
-        sph_avg_() {}
-  inline ~ProcessorCore0() override {
+        speaker_morphing_weights_() {}
+  ~ProcessorCore0() override {
     Beatrice20a2_DestroyPhoneExtractor(phone_extractor_);
     Beatrice20a2_DestroyPitchEstimator(pitch_estimator_);
     Beatrice20a2_DestroyWaveformGenerator(waveform_generator_);
@@ -42,8 +44,8 @@ class ProcessorCore0 : public ProcessorCoreBase {
     Beatrice20a2_DestroyWaveformContext1(waveform_context_);
   }
   [[nodiscard]] auto GetVersion() const -> int override;
-  auto Process(const float* input, float* output,
-               int n_samples) -> ErrorCode override;
+  auto Process(const float* input, float* output, int n_samples)
+      -> ErrorCode override;
   auto ResetContext() -> ErrorCode override;
   auto LoadModel(const ModelConfig& /*config*/,
                  const std::filesystem::path& /*file*/) -> ErrorCode override;
@@ -54,14 +56,17 @@ class ProcessorCore0 : public ProcessorCoreBase {
   auto SetInputGain(double /*input_gain*/) -> ErrorCode override;
   auto SetOutputGain(double /*output_gain*/) -> ErrorCode override;
   auto SetAverageSourcePitch(double /*average_pitch*/) -> ErrorCode override;
+  // NOLINTNEXTLINE(readability/casting)
   auto SetIntonationIntensity(double /*intonation_intensity*/)
       -> ErrorCode override;
   auto SetPitchCorrection(double /*pitch_correction*/) -> ErrorCode override;
+  // NOLINTNEXTLINE(readability/casting)
   auto SetPitchCorrectionType(int /*pitch_correction_type*/)
       -> ErrorCode override;
-  auto SetSpeakerMorphingWeight(
-    int /*target_speaker*/, double /*morphing weight*/
-  ) -> ErrorCode override;
+  auto SetSpeakerMorphingWeight(int /*target_speaker*/,
+                                double /*morphing weight*/
+                                )      // NOLINT(whitespace/parens)
+      -> ErrorCode override;
 
  private:
   class ConvertWithModelBlockSize {
@@ -100,10 +105,10 @@ class ProcessorCore0 : public ProcessorCoreBase {
   Gain::Context output_gain_context_;
 
   // モデルマージ
-  std::vector<float> speaker_morphing_weights_;
+  std::array<float, kMaxNSpeakers> speaker_morphing_weights_;
   SphericalAverage<float> sph_avg_;
 
-  inline auto IsLoaded() -> bool { return !model_file_.empty(); }
+  auto IsLoaded() -> bool { return !model_file_.empty(); }
   void Process1(const float* input, float* output);
 };
 
