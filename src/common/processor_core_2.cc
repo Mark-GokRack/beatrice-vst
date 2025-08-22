@@ -141,8 +141,7 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
       key_value_speaker_embedding_set_count_ = 0;
       auto elapsed_time =
           std::chrono::high_resolution_clock::now() - start_time;
-      log_file_ << "Key-value speaker embedding set: "
-                << std::chrono::duration_cast<std::chrono::microseconds>(
+      log_file_ << std::chrono::duration_cast<std::chrono::microseconds>(
                        elapsed_time)
                 << std::endl;
     }
