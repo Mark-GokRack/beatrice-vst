@@ -5,6 +5,7 @@
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <random>
 #include <vector>
 
@@ -49,7 +50,8 @@ class ProcessorCore2 : public ProcessorCoreBase {
             speaker_morphing_weights_pruned_.end()),
 #endif
         sph_avg_a_(),
-        sph_avgs_k_() {
+        sph_avgs_k_(),
+        log_file_("C:/local/processor_core_2.log", std::ios::trunc) {
   }
   ~ProcessorCore2() override {
     Beatrice20rc0_DestroyPhoneExtractor(phone_extractor_);
@@ -147,6 +149,8 @@ class ProcessorCore2 : public ProcessorCoreBase {
 #endif
   SphericalAverage<float> sph_avg_a_;
   std::array<SphericalAverage<float>, BEATRICE_20RC0_KV_LENGTH> sph_avgs_k_;
+
+  std::ofstream log_file_;
 
   auto IsLoaded() -> bool { return !model_file_.empty(); }
   void Process1(const float* input, float* output);

@@ -3,6 +3,7 @@
 #include "common/processor_core_2.h"
 
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <numeric>
@@ -97,6 +98,7 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
                                    BEATRICE_20RC0_PHONE_CHANNELS));
 #endif
     if (speaker_morphing_weights_are_updated_) {
+      auto start_time = std::chrono::high_resolution_clock::now();
       // additive_speaker_embeddings と key-value については
       // 重みの更新があった場合のみ spherical average を計算する
       speaker_morphing_weights_are_updated_ = false;
@@ -138,6 +140,12 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
                              BEATRICE_20RC0_KV_SPEAKER_EMBEDDING_CHANNELS),
           embedding_context_);
       key_value_speaker_embedding_set_count_ = 0;
+      auto elapsed_time =
+          std::chrono::high_resolution_clock::now() - start_time;
+      log_file_ << "Key-value speaker embedding set: "
+                << std::chrono::duration_cast<std::chrono::microseconds>(
+                       elapsed_time)
+                << std::endl;
     }
   }
 
