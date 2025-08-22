@@ -141,11 +141,14 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
       key_value_speaker_embedding_set_count_ = 0;
       auto elapsed_time =
           std::chrono::high_resolution_clock::now() - start_time;
-      log_file_ << std::chrono::duration_cast<std::chrono::microseconds>(
+      log_file_ << "sph avg :"
+                << std::chrono::duration_cast<std::chrono::microseconds>(
                        elapsed_time)
                 << std::endl;
     }
   }
+
+  auto start_time = std::chrono::high_resolution_clock::now();
 
   // Beatrice20rc0_SetKeyValueSpeakerEmbedding は重めの処理なので
   // 4 フレームかけて処理する
@@ -224,6 +227,11 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
   Beatrice20rc0_GenerateWaveform1(waveform_generator_, phone.data(),
                                   &quantized_pitch, pitch_feature.data(),
                                   output, waveform_context_);
+  auto elapsed_time = std::chrono::high_resolution_clock::now() - start_time;
+  log_file_ << "main proc : "
+            << std::chrono::duration_cast<std::chrono::microseconds>(
+                   elapsed_time)
+            << std::endl;
 }
 
 auto ProcessorCore2::ResetContext() -> ErrorCode {
