@@ -156,7 +156,7 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
       speaker_morphing_state_counter_++;
     }
     auto elapsed_time = std::chrono::high_resolution_clock::now() - start_time;
-    log_file_ << "sph avg :"
+    log_file_ << "speaker morphing :"
               << std::chrono::duration_cast<std::chrono::microseconds>(
                      elapsed_time)
               << std::endl;
