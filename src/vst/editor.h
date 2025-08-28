@@ -34,7 +34,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto PLUGIN_API open(void* parent, const PlatformType& platformType)
       -> bool SMTG_OVERRIDE;
   void PLUGIN_API close() SMTG_OVERRIDE;
-  void SyncValue(ParamID param_id, ParamValue value);
+  void SyncValue(ParamID param_id, float plain_value);
   void SyncStringValue(ParamID param_id, const std::u8string& value);
   void valueChanged(CControl* pControl) SMTG_OVERRIDE;
   // auto notify(CBaseObject* sender,
@@ -72,12 +72,16 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
     bool first_group = true;
     std::vector<CView*> column_elements;
   };
+  void SyncSourcePitchRange();
   void SyncModelDescription();
+  void SyncParameterAvailability();
   static void BeginColumn(Context&, int width, const CColor& back_color);
   auto EndColumn(Context&) -> CView*;
   auto BeginGroup(Context&, const std::u8string& name) -> CView*;
   static void EndGroup(Context&);
-  auto MakeSlider(Context&, ParamID param_id, int precision = 1) -> CView*;
+  auto MakeSlider(Context&, ParamID param_id, int precision = 1,
+                  float wheel_inc = 1.0f, float fine_wheel_inc = 0.1f)
+      -> CView*;
   auto MakeCombobox(Context&, ParamID, const CColor&, const CColor&) -> CView*;
   auto MakeFileSelector(Context&, ParamID param_id) -> CView*;
   auto MakePortraitView(Context&) -> CView*;
@@ -87,9 +91,10 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   auto EndTabColumn(Context&) -> CView*;
   auto MakeVoiceMorphingView(Context&) -> CView*;
   void SyncVoiceMorphingDescription();
+  void SyncVoiceMorphingSliders();
 
   std::map<ParamID, CControl*> controls_;
-  CFontRef font_, font_bold_;
+  CFontRef font_, font_bold_, font_description_, font_version_;
   std::optional<common::ModelConfig> model_config_;
 
   ModelVoiceDescription* model_voice_description_;

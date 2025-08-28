@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(major_version 2)
 set(minor_version 0)
 set(patch_version 0)
-set(prerelease_version "-beta.4")
+set(prerelease_version "-rc.0")
 execute_process(
     COMMAND git rev-parse --short HEAD
     OUTPUT_VARIABLE GIT_HASH
@@ -43,7 +43,9 @@ set(target beatrice_${full_version_str})
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/MT>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/MT>")
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")    
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+add_compile_options("$<$<C_COMPILER_ID:MSVC>:/arch:AVX2>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/arch:AVX2>")
 
 set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES 0)
 set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES 0)
@@ -63,6 +65,7 @@ smtg_add_vst3plugin(${target}
     src/common/parameter_state.cc
     src/common/processor_core_0.cc
     src/common/processor_core_1.cc
+    src/common/processor_core_2.cc
     src/common/processor_proxy.cc
     src/vst/controller.cc
     src/vst/editor.cc
@@ -111,14 +114,14 @@ add_dependencies(distribution ${target})
 if(NOT BEATRICE_DEV_VERSION)
     set(PARAPHERNALIA_DIR ${DISTRIBUTION_DIR}/beatrice_paraphernalia_jvs)
     file(MAKE_DIRECTORY ${PARAPHERNALIA_DIR})
-    set(BASE_URL "https://huggingface.co/fierce-cats/beatrice-2.0.0-alpha/resolve/beta.1/beta.1/beatrice_paraphernalia_jvs_076_01950000")
+    set(BASE_URL "https://huggingface.co/fierce-cats/beatrice-2.0.0-alpha/resolve/rc.0/rc.0/beatrice_paraphernalia_jvs_156_03000000")
     set(PARAPHERNALIA_FILES
         beatrice_paraphernalia_jvs.toml
         phone_extractor.bin
         pitch_estimator.bin
         speaker_embeddings.bin
-        formant_shift_embeddings.bin
         waveform_generator.bin
+        embedding_setter.bin
         noimage.png
     )
     foreach(file ${PARAPHERNALIA_FILES})

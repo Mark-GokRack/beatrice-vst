@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "vst3sdk/vstgui4/vstgui/lib/algorithm.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cbitmap.h"
 #include "vst3sdk/vstgui4/vstgui/lib/ccolor.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cdrawcontext.h"
@@ -23,11 +24,9 @@
 #include "vst3sdk/vstgui4/vstgui/lib/cpoint.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cscrollview.h"
 #include "vst3sdk/vstgui4/vstgui/lib/cstring.h"
+#include "vst3sdk/vstgui4/vstgui/lib/events.h"
 #include "vst3sdk/vstgui4/vstgui/lib/vstguibase.h"
 #include "vst3sdk/vstgui4/vstgui/lib/vstguifwd.h"
-
-// Beatrice
-#include "vst/parameter.h"
 
 namespace beatrice::vst {
 
@@ -35,7 +34,9 @@ using VSTGUI::CBitmap;
 using VSTGUI::CButtonState;
 using VSTGUI::CColor;
 using VSTGUI::CControl;
+using VSTGUI::CCoord;
 using VSTGUI::CDrawContext;
+using VSTGUI::CDrawStyle;
 using VSTGUI::CFileExtension;
 using VSTGUI::CFontRef;
 using VSTGUI::CGraphicsPath;
@@ -51,11 +52,16 @@ using VSTGUI::CPoint;
 using VSTGUI::CRect;
 using VSTGUI::CTextLabel;
 using VSTGUI::IControlListener;
+using VSTGUI::kAliasing;
 using VSTGUI::kAntiAliasing;
 using VSTGUI::kCenterText;
+using VSTGUI::kDrawFilled;
+using VSTGUI::kDrawFilledAndStroked;
+using VSTGUI::kDrawStroked;
 using VSTGUI::kLineSolid;
 using VSTGUI::kMessageNotified;
 using VSTGUI::kTransparentCColor;
+using VSTGUI::plainToNormalized;
 using VSTGUI::SharedPointer;
 using VSTGUI::UTF8String;
 
@@ -149,6 +155,67 @@ class Slider : public CHorizontalSlider {
 
   ~Slider() override { font_ref_->forget(); }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void setFineWheelInc(const float fine_wheel_inc) {
+    fine_wheel_inc_ = fine_wheel_inc;
+  }
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  [[nodiscard]] auto getFineWheelInc() const -> float {
+    return fine_wheel_inc_;
+  }
+
+  // CSliderBase::onKeyboardEvent がベース
+  void onKeyboardEvent(VSTGUI::KeyboardEvent& event) override {
+    using VSTGUI::VirtualKey;
+    if (event.type != VSTGUI::EventType::KeyDown) {
+      return;
+    }
+    switch (event.virt) {
+      case VirtualKey::Up:
+        [[fallthrough]];
+      case VirtualKey::Right:
+        [[fallthrough]];
+      case VirtualKey::Down:
+        [[fallthrough]];
+      case VirtualKey::Left: {
+        auto distance = 1.0f;
+        const auto is_inverse = isInverseStyle();
+        if ((event.virt == VirtualKey::Down && !is_inverse) ||
+            (event.virt == VirtualKey::Up && is_inverse) ||
+            (event.virt == VirtualKey::Left && !is_inverse) ||
+            (event.virt == VirtualKey::Right && is_inverse)) {
+          distance = -distance;
+        }
+
+        auto plain_value = getValue();
+        if (buttonStateFromEventModifiers(event.modifiers) & kZoomModifier) {
+          plain_value += distance * getFineWheelInc();
+        } else {
+          plain_value += distance * getWheelInc();
+        }
+        setValue(plain_value);
+
+        if (isDirty()) {
+          invalid();
+          beginEdit();
+          valueChanged();
+          endEdit();
+        }
+        event.consumed = true;
+      }
+      case VirtualKey::Escape: {
+        if (isEditing()) {
+          onMouseCancel();
+          event.consumed = true;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
   void draw(CDrawContext* const context) override {
     CHorizontalSlider::draw(context);
 
@@ -156,22 +223,23 @@ class Slider : public CHorizontalSlider {
     auto text_rect = getViewSize();
     // text_rect.inset(textInset.x, textInset.y);
 
-    const auto& param =
-        common::kSchema.GetParameter(static_cast<common::ParameterID>(tag));
-    const auto denormalized_value = Denormalize(
-        std::get<common::NumberParameter>(param), getValueNormalized());
+    const auto denormalized_value = getValue();
 
     // 値を文字で表示
     auto value_string = std::string();
-    {
+    if (enabled_) {
       value_string.resize(8);
       const auto [ptr, ec] =
           std::to_chars(std::to_address(value_string.begin()),
                         std::to_address(value_string.end()), denormalized_value,
                         std::chars_format::fixed, precision_);
       value_string.resize(ptr - std::to_address(value_string.begin()));
-      value_string += " ";
-      value_string += static_cast<const char*>(units_.c_str());
+      if (!units_.empty()) {
+        value_string += " ";
+        value_string += units_;
+      }
+    } else {
+      value_string = "Disabled";
     }
 
     const auto antialias = true;
@@ -192,10 +260,30 @@ class Slider : public CHorizontalSlider {
     setDirty(false);
   }
 
+  void SetEnabled(const bool enabled) {
+    if (enabled_ == enabled) {
+      return;
+    }
+    enabled_ = enabled;
+    if (enabled_) {
+      setMouseEnabled(true);
+      setWantsFocus(true);
+      setAlphaValue(1.0);
+    } else {
+      setMouseEnabled(false);
+      setWantsFocus(false);
+      setAlphaValue(0.3);
+    }
+  }
+
+  [[nodiscard]] auto IsEnabled() const -> bool { return enabled_; }
+
  private:
   std::string units_;
   CFontRef font_ref_;
   int precision_;
+  float fine_wheel_inc_ = 0.1f;
+  bool enabled_ = true;
 };
 
 class FileSelector : public CTextLabel {
@@ -259,12 +347,36 @@ class FileSelector : public CTextLabel {
   std::filesystem::path file_;
 };
 
-// model description が空だったらラベルも非表示にする。
-// voice description が空だったらラベルも非表示にする。
+class HorizontalLine : public VSTGUI::CView {
+ public:
+  HorizontalLine(const CRect& size, const CColor& color,
+                 const CCoord width = 1.0)
+      : CView(size), color_(color), width_(width) {}
+
+  void draw(CDrawContext* const context) override {
+    const auto size = getViewSize();
+    context->saveGlobalState();
+    context->setDrawMode(kAntiAliasing);
+    context->setFrameColor(color_);
+    context->setLineStyle(kLineSolid);
+    context->setLineWidth(width_);
+    context->drawLine(CPoint(size.left, size.top),
+                      CPoint(size.right, size.top));
+    context->restoreGlobalState();
+    setDirty(false);
+  }
+
+ protected:
+  CColor color_;
+  CCoord width_;
+};
+
+// model description が空だったら罫線も非表示にする。
+// voice description が空だったら罫線も非表示にする。
 // voice description の位置は model description の大きさに依存する。
 class ModelVoiceDescription : public VSTGUI::CScrollView {
  public:
-  ModelVoiceDescription(const CRect& area, CFontRef font,
+  ModelVoiceDescription(const CRect& area, const CFontRef font,
                         const int element_height, const int element_mergin_y)
       : VSTGUI::CScrollView(area,
                             CRect(0, 0, area.getWidth(), area.getHeight()),
@@ -280,15 +392,10 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
     scroll_bar->setBackgroundColor(kTransparentCColor);
 
     auto y = 0;
-    model_description_label_ =
-        new CTextLabel(CRect(0, y, area.getWidth(), y + element_height),
-                       "Model Description", nullptr, CParamDisplay::kNoFrame);
-    model_description_label_->setFont(font);
-    model_description_label_->setFontColor(kDarkColorScheme.on_surface);
-    model_description_label_->setHoriAlign(CHoriTxtAlign::kLeftText);
-    model_description_label_->setBackColor(kTransparentCColor);
-    addView(model_description_label_);
-    y += element_height + element_mergin_y;
+    horizontal_line_1_ = new HorizontalLine(CRect(0, y, area.getWidth(), y + 1),
+                                            kDarkColorScheme.outline, 1.0);
+    addView(horizontal_line_1_);
+    y += 1 + element_mergin_y;
 
     model_description_ = new CMultiLineTextLabel(
         CRect(0, y, area.getWidth(), area.getHeight() - y));
@@ -303,15 +410,10 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
     addView(model_description_);
     y += model_description_->getHeight() + element_mergin_y;
 
-    voice_description_label_ =
-        new CTextLabel(CRect(0, y, area.getWidth(), y + element_height),
-                       "Voice Description", nullptr, CParamDisplay::kNoFrame);
-    voice_description_label_->setFont(font);
-    voice_description_label_->setFontColor(kDarkColorScheme.on_surface);
-    voice_description_label_->setHoriAlign(CHoriTxtAlign::kLeftText);
-    voice_description_label_->setBackColor(kTransparentCColor);
-    addView(voice_description_label_);
-    y += element_height + element_mergin_y;
+    horizontal_line_2_ = new HorizontalLine(CRect(0, y, area.getWidth(), y + 1),
+                                            kDarkColorScheme.outline, 1.0);
+    addView(horizontal_line_2_);
+    y += 1 + element_mergin_y;
 
     voice_description_ = new CMultiLineTextLabel(
         CRect(0, y, area.getWidth(), area.getHeight() - y));
@@ -331,12 +433,12 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
     if (description.empty()) {
       model_description_->setText(nullptr);
       model_description_->setVisible(false);
-      model_description_label_->setVisible(false);
+      horizontal_line_1_->setVisible(false);
     } else {
       model_description_->setText(
           reinterpret_cast<const char*>(description.c_str()));
       model_description_->setVisible(true);
-      model_description_label_->setVisible(true);
+      horizontal_line_1_->setVisible(true);
     }
     AdjustVoiceDescriptionPosition();
   }
@@ -345,12 +447,12 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
     if (description.empty()) {
       voice_description_->setText(nullptr);
       voice_description_->setVisible(false);
-      voice_description_label_->setVisible(false);
+      horizontal_line_2_->setVisible(false);
     } else {
       voice_description_->setText(
           reinterpret_cast<const char*>(description.c_str()));
       voice_description_->setVisible(true);
-      voice_description_label_->setVisible(true);
+      horizontal_line_2_->setVisible(true);
     }
     AdjustVoiceDescriptionPosition();
     Invalid();
@@ -365,9 +467,9 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
  private:
   int element_height_;
   int element_mergin_y_;
-  CTextLabel* model_description_label_ = nullptr;
-  CTextLabel* voice_description_label_ = nullptr;
+  HorizontalLine* horizontal_line_1_ = nullptr;
   CMultiLineTextLabel* model_description_ = nullptr;
+  HorizontalLine* horizontal_line_2_ = nullptr;
   CMultiLineTextLabel* voice_description_ = nullptr;
   friend class Editor;
 
@@ -376,11 +478,10 @@ class ModelVoiceDescription : public VSTGUI::CScrollView {
         model_description_->getText() == nullptr
             ? 0
             : model_description_->getViewSize().bottom + element_mergin_y_ + 4;
-    auto area = getViewSize();
+    const auto area = getViewSize();
 
-    voice_description_label_->setViewSize(
-        CRect(0, y, area.getWidth(), y + element_height_));
-    y += element_height_ + element_mergin_y_;
+    horizontal_line_2_->setViewSize(CRect(0, y, area.getWidth(), y + 1));
+    y += 1 + element_mergin_y_;
     voice_description_->setViewSize(
         CRect(0, y, area.getWidth(), y + voice_description_->getHeight()));
     y += voice_description_->getHeight() + element_mergin_y_;

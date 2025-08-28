@@ -63,6 +63,8 @@ class ProcessorCore0 : public ProcessorCoreBase {
   // NOLINTNEXTLINE(readability/casting)
   auto SetPitchCorrectionType(int /*pitch_correction_type*/)
       -> ErrorCode override;
+  auto SetMinSourcePitch(double /*min_source_pitch*/) -> ErrorCode override;
+  auto SetMaxSourcePitch(double /*max_source_pitch*/) -> ErrorCode override;
   auto SetSpeakerMorphingWeight(int /*target_speaker*/,
                                 double /*morphing weight*/
                                 )      // NOLINT(whitespace/parens)
@@ -87,6 +89,8 @@ class ProcessorCore0 : public ProcessorCoreBase {
   double intonation_intensity_ = 1.0;
   double pitch_correction_ = 0.0;
   int pitch_correction_type_ = 0;
+  double min_source_pitch_ = 33.125;
+  double max_source_pitch_ = 80.875;
 
   resampler::AnyFreqInOut<ConvertWithModelBlockSize> any_freq_in_out_;
 
@@ -94,7 +98,7 @@ class ProcessorCore0 : public ProcessorCoreBase {
   Beatrice20a2_PhoneExtractor* phone_extractor_;
   Beatrice20a2_PitchEstimator* pitch_estimator_;
   Beatrice20a2_WaveformGenerator* waveform_generator_;
-  std::vector<float> speaker_embeddings_;
+  AlignedVector<float, 64> speaker_embeddings_;
   std::vector<float> formant_shift_embeddings_;
   Gain gain_;
   // 状態
@@ -106,7 +110,7 @@ class ProcessorCore0 : public ProcessorCoreBase {
 
   // モデルマージ
   std::array<float, kMaxNSpeakers> speaker_morphing_weights_;
-  SphericalAverage<float> sph_avg_;
+  SphericalAverage<float, BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS> sph_avg_;
 
   auto IsLoaded() -> bool { return !model_file_.empty(); }
   void Process1(const float* input, float* output);
