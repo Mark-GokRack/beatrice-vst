@@ -48,7 +48,14 @@ class AlignedAllocator {
 
     // allocate aligned memory at N-byte boundaries
     // note that size must be a multiple of N
+#if defined(_MSC_VER) || defined(__MINGW32__)
     void* ptr = _aligned_malloc(size, N);
+#else
+    if (size < N) {
+      size = N;
+    }
+    void* ptr = aligned_alloc(N, size);
+#endif
     // throw an exception if memory allocation fails
     if (ptr == nullptr) {
       throw std::bad_alloc();
@@ -57,7 +64,13 @@ class AlignedAllocator {
   }
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void deallocate(T* ptr, std::size_t) noexcept { _aligned_free(ptr); }
+  void deallocate(T* ptr, std::size_t) noexcept {
+#if defined(_MSC_VER) || defined(__MINGW32__)
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+  }
 
   template <class U>
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -82,11 +95,15 @@ auto operator!=(const AlignedAllocator<T, N>& lhs,
 // vector class for allocating aligned memory
 template <typename T, std::size_t N>
 using AlignedVector = std::vector<T, AlignedAllocator<T, N>>;
-
+#if defined(_MSC_VER) || defined(__MINGW32__)
+static constexpr size_t MEM_ALIGN = 64;
+#else
+static constexpr size_t MEM_ALIGN = 32;
+#endif
 template <typename T, std::size_t M>
 class SphericalAverage {
-  static_assert(M % (64 / sizeof(T)) == 0,
-                "M must be a multiple of 64/sizeof(T)");
+  static_assert(M % (MEM_ALIGN / sizeof(T)) == 0,
+                "M must be a multiple of MEM_ALIGN/sizeof(T)");
 
  public:
   SphericalAverage()
@@ -241,7 +258,7 @@ class SphericalAverage {
   }
 
   auto GetResult(size_t num_feature, T* aligned_dst_vector) -> void {
-    T* __restrict y = std::assume_aligned<64>(aligned_dst_vector);
+    T* __restrict y = std::assume_aligned<MEM_ALIGN>(aligned_dst_vector);
     assert(M == num_feature);
     MulC(M, v_[0], &p_raw_[indices_[0] * M], y);
     for (size_t n = 1; n < N_; n++) {
@@ -251,8 +268,8 @@ class SphericalAverage {
 
  private:
   auto Dot(size_t len, const T* x1, const T* x2) -> T {
-    const T* __restrict xx1 = std::assume_aligned<64>(x1);
-    const T* __restrict xx2 = std::assume_aligned<64>(x2);
+    const T* __restrict xx1 = std::assume_aligned<MEM_ALIGN>(x1);
+    const T* __restrict xx2 = std::assume_aligned<MEM_ALIGN>(x2);
     T y = static_cast<T>(0.0);
     for (size_t l = 0; l < len; l++) {
       y += xx1[l] * xx2[l];
@@ -261,15 +278,15 @@ class SphericalAverage {
   }
 
   auto MulC(size_t len, T a, T* x) -> void {
-    T* __restrict xx = std::assume_aligned<64>(x);
+    T* __restrict xx = std::assume_aligned<MEM_ALIGN>(x);
     for (size_t l = 0; l < len; l++) {
       xx[l] *= a;
     }
   }
 
   auto MulC(size_t len, T a, const T* __restrict x, T* __restrict y) -> void {
-    const T* __restrict xx = std::assume_aligned<64>(x);
-    T* __restrict yy = std::assume_aligned<64>(y);
+    const T* __restrict xx = std::assume_aligned<MEM_ALIGN>(x);
+    T* __restrict yy = std::assume_aligned<MEM_ALIGN>(y);
     for (size_t l = 0; l < len; l++) {
       yy[l] = a * xx[l];
     }
@@ -277,15 +294,15 @@ class SphericalAverage {
 
   auto AddProductC(size_t len, T a, const T* __restrict x, T* __restrict y)
       -> void {
-    const T* __restrict xx = std::assume_aligned<64>(x);
-    T* __restrict yy = std::assume_aligned<64>(y);
+    const T* __restrict xx = std::assume_aligned<MEM_ALIGN>(x);
+    T* __restrict yy = std::assume_aligned<MEM_ALIGN>(y);
     for (size_t l = 0; l < len; ++l) {
       yy[l] += a * xx[l];
     }
   }
 
   auto Sum(size_t len, const T* __restrict x) -> T {
-    const T* __restrict xx = std::assume_aligned<64>(x);
+    const T* __restrict xx = std::assume_aligned<MEM_ALIGN>(x);
     T y = 0;
     for (size_t l = 0; l < len; ++l) {
       y += xx[l];
@@ -294,11 +311,11 @@ class SphericalAverage {
   }
 
   auto NormalizeVector(size_t len, T* x) -> bool {
-    const T* __restrict xx = std::assume_aligned<64>(x);
-    T norm = sqrt(Dot(len, x, x));
+    T* __restrict xx = std::assume_aligned<MEM_ALIGN>(x);
+    T norm = sqrt(Dot(len, xx, xx));
     if (norm > static_cast<T>(0.0)) {
       T scale_factor = static_cast<T>(1.0) / norm;
-      MulC(len, scale_factor, x);
+      MulC(len, scale_factor, xx);
       return true;
     } else {
       return false;
@@ -386,8 +403,8 @@ class SphericalAverage {
 
     UpdateVGD();
 
-    T* __restrict tt = std::assume_aligned<64>(&t_[mem_idx_ * M]);
-    const T* __restrict gg = std::assume_aligned<64>(g_.data());
+    T* __restrict tt = std::assume_aligned<MEM_ALIGN>(&t_[mem_idx_ * M]);
+    const T* __restrict gg = std::assume_aligned<MEM_ALIGN>(g_.data());
     for (size_t m = 0; m < M; ++m) {
       tt[m] = gg[m] - tt[m];
     }
@@ -397,14 +414,14 @@ class SphericalAverage {
   auto UpdateQS() -> void {
     std::copy(q_.begin(), q_.end(), &s_[mem_idx_ * M]);
 
-    T* __restrict qq = std::assume_aligned<64>(q_.data());
-    const T* __restrict dd = std::assume_aligned<64>(d_.data());
+    T* __restrict qq = std::assume_aligned<MEM_ALIGN>(q_.data());
+    const T* __restrict dd = std::assume_aligned<MEM_ALIGN>(d_.data());
     for (size_t m = 0; m < M; ++m) {
       qq[m] -= dd[m];
     }
     NormalizeVector(M, q_.data());
 
-    T* __restrict ss = std::assume_aligned<64>(&s_[mem_idx_ * M]);
+    T* __restrict ss = std::assume_aligned<MEM_ALIGN>(&s_[mem_idx_ * M]);
     for (size_t m = 0; m < M; ++m) {
       ss[m] = qq[m] - ss[m];
     }
@@ -429,21 +446,21 @@ class SphericalAverage {
   bool converged_;
 
   // vectors in original space
-  std::vector<size_t> indices_;  // size = N_lim
-  AlignedVector<T, 64> w_;       // size = N_lim
-  AlignedVector<T, 64> p_;       // size = N_all * M
-  AlignedVector<T, 64> p_raw_;   // size = N_all * M
-  AlignedVector<T, 64> q_;       // size = M
-  AlignedVector<T, 64> v_;       // size = N_lim
-  AlignedVector<T, 64> g_;       // size = M
+  std::vector<size_t> indices_;        // size = N_lim
+  AlignedVector<T, MEM_ALIGN> w_;      // size = N_lim
+  AlignedVector<T, MEM_ALIGN> p_;      // size = N_all * M
+  AlignedVector<T, MEM_ALIGN> p_raw_;  // size = N_all * M
+  AlignedVector<T, MEM_ALIGN> q_;      // size = M
+  AlignedVector<T, MEM_ALIGN> v_;      // size = N_lim
+  AlignedVector<T, MEM_ALIGN> g_;      // size = M
 
   size_t mem_idx_;
   T gamma_;
-  AlignedVector<T, 64> d_;  // size = M
-  AlignedVector<T, 64> s_;  // size = K * M
-  AlignedVector<T, 64> t_;  // size = K * M
-  AlignedVector<T, 64> r_;  // size = K
-  AlignedVector<T, 64> a_;  // size = K
+  AlignedVector<T, MEM_ALIGN> d_;  // size = M
+  AlignedVector<T, MEM_ALIGN> s_;  // size = K * M
+  AlignedVector<T, MEM_ALIGN> t_;  // size = K * M
+  AlignedVector<T, MEM_ALIGN> r_;  // size = K
+  AlignedVector<T, MEM_ALIGN> a_;  // size = K
 };
 
 }  // namespace beatrice::common
