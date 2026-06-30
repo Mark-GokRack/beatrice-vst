@@ -500,11 +500,18 @@ auto ProcessorCore2::SetSpeakerMorphingWeight(int target_speaker_id,
     // codebook 抽選用の分布を更新する。Process1 内で毎フレーム param() を
     // 呼ぶと audio スレッドで std::vector を確保することになるため、
     // 重みが変わるこちら側で更新しておく。
-    speaker_morphing_codebook_lottery_.param(
-        std::discrete_distribution<int>::param_type(
-            speaker_morphing_weights_pruned_.begin(),
-            speaker_morphing_weights_pruned_.end()));
-
+    if (speaker_morphing_weights_pruned_[indices[0]] == 0.0f) {
+      // 全ての重みがゼロの場合は、最初の話者を選ぶようにする
+      auto identity_weights = std::vector<float>{1.0f};
+      speaker_morphing_codebook_lottery_.param(
+          std::discrete_distribution<int>::param_type(identity_weights.begin(),
+                                                      identity_weights.end()));
+    } else {
+      speaker_morphing_codebook_lottery_.param(
+          std::discrete_distribution<int>::param_type(
+              speaker_morphing_weights_pruned_.begin(),
+              speaker_morphing_weights_pruned_.end()));
+    }
     // ここでsph_avg_a_などの重みを更新(sph_avg_.SetWeights())してしまうと、
     // モデル読み込み時に一気にkMaxNSpeakersの数だけ重みが設定されるため処理が重くなるので、
     // フラグだけ立てて次のフレームから更新するようにする。
