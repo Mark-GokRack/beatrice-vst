@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Project Beatrice and Contributors
+// Copyright (c) 2024-2026 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_SPHERICAL_AVERAGE_H_
 #define BEATRICE_COMMON_SPHERICAL_AVERAGE_H_
@@ -7,9 +7,9 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
-#include <cstdlib>
 #include <limits>
 #include <memory>
+#include <new>
 #include <vector>
 
 /**
@@ -29,6 +29,9 @@ namespace beatrice::common {
 // custom allocator for aligned vectors.
 template <typename T, std::size_t N>
 class AlignedAllocator {
+  static_assert((N & (N - 1)) == 0);
+  static_assert(N >= alignof(T));
+
  public:
   using value_type = T;
 
@@ -42,34 +45,12 @@ class AlignedAllocator {
     if (n == 0) {
       return nullptr;
     }
-    // calculate memory size
-    // N must be a multiple of the size of T
-    std::size_t size = n * sizeof(T);
-
-    // allocate aligned memory at N-byte boundaries
-    // note that size must be a multiple of N
-#if defined(_MSC_VER) || defined(__MINGW32__)
-    void* ptr = _aligned_malloc(size, N);
-#else
-    if (size < N) {
-      size = N;
-    }
-    void* ptr = aligned_alloc(N, size);
-#endif
-    // throw an exception if memory allocation fails
-    if (ptr == nullptr) {
-      throw std::bad_alloc();
-    }
-    return static_cast<T*>(ptr);
+    return static_cast<T*>(::operator new(n * sizeof(T), std::align_val_t{N}));
   }
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   void deallocate(T* ptr, std::size_t) noexcept {
-#if defined(_MSC_VER) || defined(__MINGW32__)
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
+    ::operator delete(ptr, std::align_val_t{N});
   }
 
   template <class U>
@@ -367,13 +348,16 @@ class SphericalAverage {
 
     for (size_t n = 0; n < N_; n++) {
       T cos_th = Dot(M, &p_[indices_[n] * M], q_.data());
+      // Clamp to [-1, 1] to guard against floating-point overshoot
+      cos_th = std::clamp(cos_th, static_cast<T>(-1), static_cast<T>(1));
       T theta = acos(cos_th);
       T inv_sinc_th = static_cast<T>(1.0) /
                       (Sinc(theta) + std::numeric_limits<T>::epsilon());
       sum_w_c_s += w_[n] * cos_th * inv_sinc_th;
       v_[n] = w_[n] * inv_sinc_th;
-      T a_n = -static_cast<T>(2.0) * w_[n] * theta /
-              sqrt(static_cast<T>(1.0) - cos_th * cos_th);
+      // a_n = -2 * w_n * theta / sin(theta) = -2 * v_n
+      // (using v_n already computed via the stable Sinc path above)
+      T a_n = -static_cast<T>(2.0) * v_[n];
       AddProductC(M, a_n, &p_[indices_[n] * M], g_.data());
     }
 

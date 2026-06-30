@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Project Beatrice and Contributors
+// Copyright (c) 2024-2026 Project Beatrice and Contributors
 
 #include "common/processor_core_2.h"
 
@@ -12,7 +12,7 @@
 
 namespace beatrice::common {
 
-auto ProcessorCore2::GetVersion() const -> int { return 1; }
+auto ProcessorCore2::GetVersion() const -> int { return 2; }
 auto ProcessorCore2::Process(const float* const input, float* const output,
                              const int n_samples) -> ErrorCode {
   const auto fill_zero = [output, n_samples] {
@@ -85,10 +85,8 @@ void ProcessorCore2::Process1(const float* const input, float* const output) {
 #else
     // 重みを抽選確率として用いて毎フレームランダムな話者ののものを抽選で選ぶ場合
     // この場合も codebook のサイズは (n_speaker_+1)ではなくて(n_speaker_)で十分
-    speaker_morphing_codebook_lottery_.param(
-        std::discrete_distribution<int>::param_type(
-            speaker_morphing_weights_pruned_.begin(),
-            speaker_morphing_weights_pruned_.end()));
+    // discrete_distribution::param() は内部で std::vector を確保するので
+    // ここでは抽選のみ行い、重み更新は SetSpeakerMorphingWeight 側に置く。
     auto idx = speaker_morphing_codebook_lottery_(
         speaker_morphing_codebook_lottery_engine_);
     Beatrice20rc0_SetCodebook(
@@ -480,7 +478,8 @@ auto ProcessorCore2::SetSpeakerMorphingWeight(int target_speaker_id,
   if (target_speaker_id < 0 || target_speaker_id >= kMaxNSpeakers) {
     return ErrorCode::kSpeakerIDOutOfRange;
   }
-  speaker_morphing_weights_[target_speaker_id] = morphing_weight;
+  speaker_morphing_weights_[target_speaker_id] =
+      static_cast<float>(morphing_weight);
 
   if (target_speaker_id < n_speakers_) {
     /* 非ゼロ weight の個数が設定値を超えないように、大きい方から順番に残す */
@@ -495,8 +494,16 @@ auto ProcessorCore2::SetSpeakerMorphingWeight(int target_speaker_id,
           speaker_morphing_weights_[indices[i]];
     }
     for (int i = kSphAvgMaxNSpeakers; i < n_speakers_; ++i) {
-      speaker_morphing_weights_pruned_[indices[i]] = 0.0;
+      speaker_morphing_weights_pruned_[indices[i]] = 0.0f;
     }
+
+    // codebook 抽選用の分布を更新する。Process1 内で毎フレーム param() を
+    // 呼ぶと audio スレッドで std::vector を確保することになるため、
+    // 重みが変わるこちら側で更新しておく。
+    speaker_morphing_codebook_lottery_.param(
+        std::discrete_distribution<int>::param_type(
+            speaker_morphing_weights_pruned_.begin(),
+            speaker_morphing_weights_pruned_.end()));
 
     // ここでsph_avg_a_などの重みを更新(sph_avg_.SetWeights())してしまうと、
     // モデル読み込み時に一気にkMaxNSpeakersの数だけ重みが設定されるため処理が重くなるので、

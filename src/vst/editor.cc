@@ -1,10 +1,8 @@
-// Copyright (c) 2024-2025 Project Beatrice and Contributors
+// Copyright (c) 2024-2026 Project Beatrice and Contributors
 
 // TODO(refactor)
 
 #include "vst/editor.h"
-
-#include <windows.h>
 
 #include <algorithm>
 #include <cstring>
@@ -557,7 +555,8 @@ void Editor::valueChanged(CControl* const pControl) {
     msg->setMessageID("param_change");
     msg->getAttributes()->setBinary("param_id", &vst_param_id,
                                     sizeof(vst_param_id));
-    msg->getAttributes()->setBinary("data", file.c_str(), file.size());
+    msg->getAttributes()->setBinary(
+        "data", file.c_str(), static_cast<Steinberg::uint32>(file.size()));
     controller->sendMessage(msg);
     msg->release();
   } else {
@@ -714,7 +713,8 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
       CRect(0, 0, kElementWidth, kElementHeight).offset(context.x, context.y),
       this, static_cast<int>(param_id), context.x,
       context.x + kElementWidth - kHandleWidth, handle_bmp, slider_bmp,
-      VST3::StringConvert::convert(param->getInfo().units), font_, precision);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().units), font_,
+      precision);
   slider_control->setMin(param->GetMinPlain());
   slider_control->setMax(param->GetMaxPlain());
   slider_control->setWheelInc(wheel_inc);
@@ -734,7 +734,7 @@ auto Editor::MakeSlider(Context& context, const ParamID param_id,
       CRect(0, 0, kLabelWidth, kElementHeight)
           .offset(context.x + kElementWidth + kElementMerginX, context.y);
   const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().title);
   auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
                                              nullptr, CParamDisplay::kNoFrame);
   title_control->setBackColor(kTransparentCColor);
@@ -770,7 +770,7 @@ auto Editor::MakeCombobox(
   for (auto i = 0; i <= step_count; ++i) {
     String128 tmp_string128;
     param->toString(param->toNormalized(i), tmp_string128);
-    const auto name = VST3::StringConvert::convert(tmp_string128);
+    const auto name = Steinberg::Vst::StringConvert::convert(tmp_string128);
     control->addEntry(name.c_str());
   }
   control->setValue(static_cast<float>(
@@ -804,7 +804,7 @@ auto Editor::MakeCombobox(
       CRect(0, 0, kLabelWidth, kElementHeight)
           .offset(context.x + kElementWidth + kElementMerginX, context.y);
   const auto title_string =
-      VST3::StringConvert::convert(param->getInfo().title);
+      Steinberg::Vst::StringConvert::convert(param->getInfo().title);
   auto* const title_control = new CTextLabel(title_pos, title_string.c_str(),
                                              nullptr, CParamDisplay::kNoFrame);
   title_control->setBackColor(kTransparentCColor);
@@ -972,7 +972,8 @@ auto Editor::MakeVoiceMorphingView(Context& context) -> CView* {
             .offset(0, i * (kElementHeight + kElementMerginY)),
         this, static_cast<int>(param_id), 0, kElementWidth - kHandleWidth,
         handle_bmp, slider_bmp,
-        VST3::StringConvert::convert(param->getInfo().units), font_, 2);
+        Steinberg::Vst::StringConvert::convert(param->getInfo().units), font_,
+        2);
     slider_control->setValue(
         static_cast<float>(param->toPlain(param->getNormalized())));
     slider_control->setVisible(false);

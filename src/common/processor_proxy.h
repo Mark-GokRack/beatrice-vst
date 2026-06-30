@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Project Beatrice and Contributors
+// Copyright (c) 2024-2026 Project Beatrice and Contributors
 
 #ifndef BEATRICE_COMMON_PROCESSOR_PROXY_H_
 #define BEATRICE_COMMON_PROCESSOR_PROXY_H_
@@ -73,7 +73,7 @@ class ProcessorProxy {
     } catch (const toml::syntax_error) {
       error_code = ErrorCode::kTOMLSyntaxError;
       goto fail;
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
       error_code = ErrorCode::kUnknownError;
       goto fail;
     }

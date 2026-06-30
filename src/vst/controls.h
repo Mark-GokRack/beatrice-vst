@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Project Beatrice and Contributors
+// Copyright (c) 2024-2026 Project Beatrice and Contributors
 
 #ifndef BEATRICE_VST_CONTROLS_H_
 #define BEATRICE_VST_CONTROLS_H_
@@ -305,7 +305,9 @@ class FileSelector : public CTextLabel {
           CNewFileSelector::create(getFrame(), CNewFileSelector::kSelectFile);
       if (selector) {
         selector->addFileExtension(CFileExtension("TOML", "toml"));
-        selector->run(this);  // notify に送られる
+        selector->run([self = VSTGUI::shared(this)](CNewFileSelector* sender) {
+          self->notify(sender, CNewFileSelector::kSelectEndMessage);
+        });
         selector->forget();
       }
       return VSTGUI::kMouseEventHandled;
