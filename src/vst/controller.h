@@ -22,6 +22,7 @@ class Controller : public Steinberg::Vst::EditController {
   using EditorView = Steinberg::Vst::EditorView;
   using ParamID = Steinberg::Vst::ParamID;
   using ParamValue = Steinberg::Vst::ParamValue;
+  using IMessage = Steinberg::Vst::IMessage;
 
  public:
   ~Controller() override;
@@ -43,6 +44,8 @@ class Controller : public Steinberg::Vst::EditController {
 
   auto PLUGIN_API setParamNormalized(ParamID param_id, ParamValue value)
       -> tresult SMTG_OVERRIDE;
+
+  auto PLUGIN_API notify(IMessage* message) -> tresult SMTG_OVERRIDE;
 
  private:
   common::ControllerCore core_;

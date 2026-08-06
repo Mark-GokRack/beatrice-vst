@@ -60,6 +60,7 @@ class ProcessorCore2 : public ProcessorCoreBase {
     Beatrice20rc0_DestroyEmbeddingContext(embedding_context_);
   }
   [[nodiscard]] auto GetVersion() const -> int override;
+  [[nodiscard]] auto GetLatencySamples() const -> int override;
   auto Process(const float* input, float* output, int n_samples)
       -> ErrorCode override;
   auto ResetContext() -> ErrorCode override;

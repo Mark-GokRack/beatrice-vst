@@ -422,6 +422,17 @@ const ParameterSchema kSchema = [] {
            u8"MrphCt"s, parameter_flag::kCanAutomate,
            SetVoiceMorphParameterOnController,
            SetVoiceMorphParameterOnProcessor)},
+      {ParameterID::kLatencyReporting,
+       ListParameter(
+           u8"Latency Reporting"s,
+           {u8"Off — Responsive"s, u8"On — DAW-Compensated"s}, 0, u8"LatRpt"s,
+           parameter_flag::kIsList,
+           [](ControllerCore&, int) -> ErrorCode {
+             return ErrorCode::kSuccess;
+           },
+           [](ProcessorProxy&, int) -> ErrorCode {
+             return ErrorCode::kSuccess;
+           })},
   });
 
   for (auto i = 0; i < kMaxNVoiceMorphMarkers; ++i) {

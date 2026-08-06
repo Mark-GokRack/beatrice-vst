@@ -21,6 +21,11 @@
 namespace beatrice::common {
 
 auto ProcessorCore2::GetVersion() const -> int { return 2; }
+auto ProcessorCore2::GetLatencySamples() const -> int {
+  const auto sample_rate = any_freq_in_out_.GetSampleRate();
+  return static_cast<int>(
+      std::round(0.0375 * sample_rate + any_freq_in_out_.GetLatencySamples()));
+}
 auto ProcessorCore2::Process(const float* const input, float* const output,
                              const int n_samples) -> ErrorCode {
   const auto fill_zero = [output, n_samples]() -> void {

@@ -65,6 +65,7 @@ enum class ParameterID : std::int16_t {
   kVoiceMorphMarkerVoiceBase = 19,
   kVoiceMorphMarkerXBase = kVoiceMorphMarkerVoiceBase + kMaxNVoiceMorphMarkers,
   kVoiceMorphMarkerYBase = kVoiceMorphMarkerXBase + kMaxNVoiceMorphMarkers,
+  kLatencyReporting = kVoiceMorphMarkerYBase + kMaxNVoiceMorphMarkers,
   kAverageTargetPitchBase = 100,
   kEnd = kAverageTargetPitchBase + kMaxNSpeakers + 1,
 };

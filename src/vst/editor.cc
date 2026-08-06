@@ -612,25 +612,33 @@ auto PLUGIN_API Editor::open(void* const parent,
   main_page->addView(voice_description_pane_);
 
   // Tuning ページ
-  auto* tuning_panel = new SurfacePanel(CRect(16, 16, 336, 304), panel_surface,
-                                        CColor(0xff, 0xff, 0xff, 0x0d), 3.0);
-  tuning_page->addView(tuning_panel);
-  auto* const detail_heading_font = new CFontDesc("Segoe UI", 28);
-  auto* const detail_title =
-      make_label(tuning_panel, CRect(28, 27, 292, 62), "Tuning",
-                 detail_heading_font, CColor(0xf0, 0xcf, 0x90));
-  detail_title->setMouseEnabled(false);
-  detail_heading_font->forget();
-  add_slider(tuning_panel,
+  auto* pitch_correction_panel =
+      new SurfacePanel(CRect(16, 16, 336, 272), panel_surface,
+                       CColor(0xff, 0xff, 0xff, 0x0d), 3.0);
+  tuning_page->addView(pitch_correction_panel);
+  add_title(pitch_correction_panel, CRect(0, 14, 320, 36), "PITCH CORRECTION");
+  add_slider(pitch_correction_panel,
              static_cast<ParamID>(ParameterID::kIntonationIntensity),
-             CRect(28, 80, 292, 123), 1, 0.5f, 0.1f);
-  add_slider(tuning_panel, static_cast<ParamID>(ParameterID::kPitchCorrection),
-             CRect(28, 140, 292, 183), 1, 0.5f, 0.1f);
-  make_label(tuning_panel, CRect(28, 210, 292, 228), "Pitch Correction Type",
-             font_small_, CColor(0xb8, 0xb5, 0xaf));
-  add_option_menu(tuning_panel,
+             CRect(28, 50, 292, 93), 1, 0.5f, 0.1f);
+  add_slider(pitch_correction_panel,
+             static_cast<ParamID>(ParameterID::kPitchCorrection),
+             CRect(28, 108, 292, 151), 1, 0.5f, 0.1f);
+  make_label(pitch_correction_panel, CRect(28, 178, 292, 196),
+             "Pitch Correction Type", font_small_, CColor(0xb8, 0xb5, 0xaf));
+  add_option_menu(pitch_correction_panel,
                   static_cast<ParamID>(ParameterID::kPitchCorrectionType),
-                  CRect(28, 236, 292, 264));
+                  CRect(28, 204, 292, 232));
+
+  auto* latency_panel =
+      new SurfacePanel(CRect(352, 16, 672, 148), panel_surface,
+                       CColor(0xff, 0xff, 0xff, 0x0d), 3.0);
+  tuning_page->addView(latency_panel);
+  add_title(latency_panel, CRect(0, 14, 320, 36), "LATENCY");
+  make_label(latency_panel, CRect(28, 50, 292, 68), "Latency Reporting",
+             font_small_, CColor(0xb8, 0xb5, 0xaf));
+  add_option_menu(latency_panel,
+                  static_cast<ParamID>(ParameterID::kLatencyReporting),
+                  CRect(28, 78, 292, 108));
 
   // Voice 選択メニュー
   voice_menu_overlay_ = new VoiceMenuOverlayView(
@@ -1236,6 +1244,15 @@ void Editor::valueChanged(CControl* const pControl) {
     }
     assert(error_code == common::ErrorCode::kSuccess);
     PerformParameterEdit(vst_param_id, normalized_value);
+    if (param_id == ParameterID::kLatencyReporting) {
+      if (const auto msg = Steinberg::owned(controller->allocateMessage())) {
+        msg->setMessageID("param_change");
+        msg->getAttributes()->setBinary("param_id", &vst_param_id,
+                                        sizeof(vst_param_id));
+        msg->getAttributes()->setInt("data", plain_value);
+        controller->sendMessage(msg);
+      }
+    }
   } else if (auto* const control = dynamic_cast<FileSelector*>(pControl)) {
     const auto* const str_param = std::get_if<common::StringParameter>(&param);
     assert(str_param);

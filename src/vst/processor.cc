@@ -2,13 +2,23 @@
 
 #include "vst/processor.h"
 
+#include <cassert>
 #include <cstring>
+#include <ios>
 #include <memory>
 #include <mutex>  // NOLINT(build/c++11)
+#include <sstream>
 #include <string>
+#include <variant>
 
+#include "vst3sdk/pluginterfaces/base/fplatform.h"
+#include "vst3sdk/pluginterfaces/base/fstrdefs.h"
+#include "vst3sdk/pluginterfaces/base/ftypes.h"
+#include "vst3sdk/pluginterfaces/base/funknown.h"
+#include "vst3sdk/pluginterfaces/vst/ivstaudioprocessor.h"
 #include "vst3sdk/pluginterfaces/vst/ivstparameterchanges.h"
 #include "vst3sdk/pluginterfaces/vst/vstspeaker.h"
+#include "vst3sdk/public.sdk/source/vst/vstaudioeffect.h"
 
 // Beatrice
 #include "common/error.h"
@@ -76,7 +86,7 @@ auto PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* const inputs,
 // setup.processMode         kRealtime or kPrefetch or kOffline
 // setup.symbolicSampleSize  kSample32 or kSample64
 auto PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) -> tresult {
-  std::lock_guard<std::mutex> lock(mtx_);
+  const std::scoped_lock lock(mtx_);
   if (setup.symbolicSampleSize == Steinberg::Vst::kSample64) {
     return kResultFalse;
   }
@@ -90,7 +100,7 @@ auto PLUGIN_API Processor::setActive(const TBool state) -> tresult {
     // メモリの確保など
   } else {
     // メモリの解放など
-    std::lock_guard<std::mutex> lock(mtx_);
+    const std::scoped_lock lock(mtx_);
     const auto error_code = vc_core_.GetCore()->ResetContext();
     assert(error_code == common::ErrorCode::kSuccess);
   }
@@ -98,6 +108,17 @@ auto PLUGIN_API Processor::setActive(const TBool state) -> tresult {
 }
 
 // TODO(bug): tail を設定する
+
+auto PLUGIN_API Processor::getLatencySamples() -> uint32 {
+  const std::scoped_lock lock(mtx_);
+  const auto latency_reporting =
+      std::get<int>(vc_core_.GetParameterState().GetValue(
+          common::ParameterID::kLatencyReporting));
+  if (latency_reporting == 0) {
+    return 0;
+  }
+  return static_cast<uint32>(vc_core_.GetCore()->GetLatencySamples());
+}
 
 // メイン処理
 auto PLUGIN_API Processor::process(ProcessData& data) -> tresult {
@@ -126,7 +147,7 @@ auto PLUGIN_API Processor::process(ProcessData& data) -> tresult {
     }
   }
 
-  std::unique_lock<std::mutex> lock(mtx_, std::try_to_lock);
+  const std::unique_lock<std::mutex> lock(mtx_, std::try_to_lock);
   // ファイルの読み込み中はパラメータ変更の処理を先送りにし、
   // 無音を出力する
   if (!lock.owns_lock()) {
@@ -231,7 +252,7 @@ auto PLUGIN_API Processor::process(ProcessData& data) -> tresult {
 // kResultFalse を返した場合、StudioRack などでは
 // Controller::setComponentState が呼ばれなくなるため注意が必要。
 auto PLUGIN_API Processor::setState(IBStream* const state) -> tresult {
-  std::lock_guard<std::mutex> lock(mtx_);
+  const std::scoped_lock lock(mtx_);
   int siz;
   if (state->read(&siz, sizeof(siz)) != kResultTrue) {
     return kResultFalse;
@@ -250,7 +271,7 @@ auto PLUGIN_API Processor::setState(IBStream* const state) -> tresult {
 }
 
 auto PLUGIN_API Processor::getState(IBStream* const state) -> tresult {
-  std::lock_guard<std::mutex> lock(mtx_);
+  const std::scoped_lock lock(mtx_);
   auto oss = std::ostringstream(std::ios::binary);
   if (vc_core_.Write(oss) != common::ErrorCode::kSuccess) {
     return kResultFalse;
@@ -270,7 +291,6 @@ auto PLUGIN_API Processor::getState(IBStream* const state) -> tresult {
 auto PLUGIN_API Processor::notify(IMessage* const message) -> tresult {
   const auto* const message_id = message->getMessageID();
   if (std::strcmp(message_id, "param_change") == 0) {
-    std::lock_guard<std::mutex> lock(mtx_);
     uint32 siz;
     const void* data;
     if (message->getAttributes()->getBinary("param_id", data, siz) !=
@@ -282,18 +302,40 @@ auto PLUGIN_API Processor::notify(IMessage* const message) -> tresult {
     }
     ParamID vst_param_id;
     std::memcpy(&vst_param_id, data, sizeof(vst_param_id));
+    const auto param_id = static_cast<common::ParameterID>(vst_param_id);
+    if (param_id == common::ParameterID::kLatencyReporting) {
+      Steinberg::int64 latency_reporting;
+      if (message->getAttributes()->getInt("data", latency_reporting) !=
+          kResultTrue) {
+        return kResultFalse;
+      }
+      {
+        const std::scoped_lock lock(mtx_);
+        [[maybe_unused]] const auto error_code = vc_core_.SetParameter(
+            param_id, static_cast<int>(latency_reporting));
+        assert(error_code == common::ErrorCode::kSuccess);
+      }
+      sendMessageID("latency_changed");
+      return kResultTrue;
+    }
     if (message->getAttributes()->getBinary("data", data, siz) != kResultTrue) {
       return kResultFalse;
     }
     auto value = std::u8string();
     value.resize(siz);
     std::memcpy(value.data(), data, siz);
-    const auto param_id = static_cast<common::ParameterID>(vst_param_id);
-    // Controller 側の状態との整合性を維持するため、
-    // Controller 側や Host から送られた設定値は、たとえ不正なものでも
-    // なるべくそのまま保持する。
-    [[maybe_unused]] const auto error_code =
-        vc_core_.SetParameter(param_id, value);
+    {
+      const std::scoped_lock lock(mtx_);
+      // Controller 側の状態との整合性を維持するため、
+      // Controller 側や Host から送られた設定値は、たとえ不正なものでも
+      // なるべくそのまま保持する。
+      [[maybe_unused]] const auto error_code =
+          vc_core_.SetParameter(param_id, value);
+    }
+    if (param_id == common::ParameterID::kModel) {
+      // モデルの変更は遅延量の変更を伴う可能性がある
+      sendMessageID("latency_changed");
+    }
     return kResultTrue;
   }
   return AudioEffect::notify(message);

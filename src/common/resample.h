@@ -400,6 +400,8 @@ class ConvertStreamFunctionFrom2In3OutTo6InOut {
 // m サンプル返すオブジェクトにする
 template <class ProcessWithModelBlockSize>
 class AnyFreqInOut {
+  static constexpr auto kResamplingFilterSize = 32;
+
   using ProcessWith6n =
       ConvertStreamFunctionFrom2In3OutTo6InOut<80, ProcessWithModelBlockSize>;
   using ProcessWithAnyBlockSize =
@@ -412,7 +414,7 @@ class AnyFreqInOut {
   explicit AnyFreqInOut(const double sample_rate)
       : process_(ProcessWithAnyFrequency(
             ProcessWithAnyBlockSize(ProcessWith6n(ProcessWithModelBlockSize())),
-            48000.0, sample_rate, 32,
+            48000.0, sample_rate, kResamplingFilterSize,
             0.99 * 16000.0 / std::clamp(sample_rate, 16000.0, 48000.0),
             0.99 * 24000.0 / std::clamp(sample_rate, 24000.0, 48000.0))) {}
 
@@ -425,13 +427,23 @@ class AnyFreqInOut {
   void SetSampleRate(const double sample_rate) {
     process_ = ProcessWithAnyFrequency(
         ProcessWithAnyBlockSize(ProcessWith6n(ProcessWithModelBlockSize())),
-        48000.0, sample_rate, 32,
+        48000.0, sample_rate, kResamplingFilterSize,
         0.99 * 16000.0 / std::clamp(sample_rate, 16000.0, 48000.0),
         0.99 * 24000.0 / std::clamp(sample_rate, 24000.0, 48000.0));
   }
 
   [[nodiscard]] auto GetSampleRate() const -> double {
     return process_.GetTargetFrequency();
+  }
+
+  [[nodiscard]] auto GetLatencySamples() const -> double {
+    const auto sample_rate = GetSampleRate();
+    if (sample_rate <= 0.0) {
+      return 0.0;
+    }
+    // 往復それぞれの FIR が、低い方のサンプリング周波数で
+    // filter size の半分ずつの遅延を持つ。
+    return kResamplingFilterSize * sample_rate / std::min(sample_rate, 48000.0);
   }
 
   [[nodiscard]] auto IsReady() const -> bool { return process_.IsReady(); }
