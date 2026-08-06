@@ -113,6 +113,7 @@ class ProcessorCore2 : public ProcessorCoreBase {
   int vq_num_neighbors_ = 0;
 
   resampler::AnyFreqInOut<ConvertWithModelBlockSize> any_freq_in_out_;
+  resampler::SameFreqInOut<ConvertWithModelBlockSize> same_freq_in_out_;
 
   // モデル
   Beatrice20rc0_PhoneExtractor* phone_extractor_;

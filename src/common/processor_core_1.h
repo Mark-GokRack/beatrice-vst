@@ -92,6 +92,7 @@ class ProcessorCore1 : public ProcessorCoreBase {
   double max_source_pitch_ = 80.875;
 
   resampler::AnyFreqInOut<ConvertWithModelBlockSize> any_freq_in_out_;
+  resampler::SameFreqInOut<ConvertWithModelBlockSize> same_freq_in_out_;
 
   // モデル
   Beatrice20b1_PhoneExtractor* phone_extractor_;

@@ -42,7 +42,12 @@ auto ProcessorCore1::Process(const float* const input, float* const output,
   assert(static_cast<int>(formant_shift_embeddings_.size()) ==
          9 * BEATRICE_WAVEFORM_GENERATOR_HIDDEN_CHANNELS);
   gain_.Process(input, output, n_samples, input_gain_context_);
-  any_freq_in_out_(output, output, n_samples, *this);
+  if (n_samples == same_freq_in_out_.GetBlockSize() &&
+      any_freq_in_out_.GetSampleRate() == same_freq_in_out_.GetSampleRate()) {
+    same_freq_in_out_(output, output, n_samples, *this);
+  } else {
+    any_freq_in_out_(output, output, n_samples, *this);
+  }
   gain_.Process(output, output, n_samples, output_gain_context_);
   return ErrorCode::kSuccess;
 }

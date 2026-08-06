@@ -437,6 +437,63 @@ class AnyFreqInOut {
   [[nodiscard]] auto IsReady() const -> bool { return process_.IsReady(); }
 };
 
+// ProcessWithAnyBlockSize による遅延を取り除くためのファストパス用クラス
+// 16kHz で 160 サンプル受け取って 24kHz で 240 サンプル返す関数をラップして、
+// サンプリング周波数 48kHz で 480 サンプル受け取って
+// 480 サンプル返すオブジェクトにする
+template <class ProcessWithModelBlockSize>
+class SameFreqInOut {
+  static constexpr int kBlockSize = 80 * 6;
+  using ProcessWith6n =
+      ConvertStreamFunctionFrom2In3OutTo6InOut<80, ProcessWithModelBlockSize>;
+  ProcessWith6n process_;
+  DownUpSamplerImpl lpf_;
+  std::vector<float> buf_io_;
+  std::vector<float> buf_work_;
+
+ public:
+  SameFreqInOut()
+      : process_(ProcessWith6n(ProcessWithModelBlockSize())),
+        lpf_(48000.0, 48000.0, 32, 0.99 * 16000.0 / 48000.0,
+             0.99 * 24000.0 / 48000.0),
+        buf_io_(kBlockSize),
+        buf_work_(kBlockSize) {}
+
+  // 入出力サンプル数は 480 固定
+  template <class... Context>
+  auto operator()(const float* const input, float* const output, const int m,
+                  Context&&... context) {
+    assert(m == kBlockSize);
+    std::memcpy(buf_io_.data(), input, m * sizeof(float));
+
+    // 入力側 LPF（48kHz -> 48kHz）
+    lpf_.ResampleIn(buf_io_, buf_work_);
+    assert(static_cast<int>(buf_work_.size()) == m);
+
+    process_(buf_work_.data(), buf_io_.data(),
+             std::forward<Context>(context)...);
+
+    // 出力側 LPF（48kHz -> 48kHz）
+    lpf_.ResampleOut(buf_io_, buf_work_);
+    assert(static_cast<int>(buf_work_.size()) == m);
+    std::memcpy(output, buf_work_.data(), m * sizeof(float));
+  }
+
+  void SetSampleRate(const double sample_rate) {
+    assert(sample_rate == 48000.0);
+  }
+
+  [[nodiscard]] static constexpr auto GetSampleRate() -> double {
+    return 48000.0;
+  }
+
+  [[nodiscard]] static constexpr auto GetBlockSize() -> int {
+    return kBlockSize;
+  }
+
+  [[nodiscard]] auto IsReady() const -> bool { return lpf_.IsReady(); }
+};
+
 }  // namespace beatrice::resampler
 
 #endif  // BEATRICE_COMMON_RESAMPLE_H_
