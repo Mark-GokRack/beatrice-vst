@@ -33,11 +33,17 @@ using VSTGUI::kDrawStroked;
 using common::VoiceMorphMarker;
 using common::VoiceMorphState;
 
-class MorphPadView final : public CControl {
+class MorphStateControl : public CControl {
+ public:
+  using CControl::CControl;
+  [[nodiscard]] virtual auto GetState() const -> const VoiceMorphState& = 0;
+};
+
+class MorphPadView final : public MorphStateControl {
  public:
   MorphPadView(const CRect& rect, IControlListener* const listener,
                CFontRef label_font, CFontRef name_font)
-      : CControl(rect, listener, -1),
+      : MorphStateControl(rect, listener, -1),
         label_font_(label_font),
         name_font_(name_font) {
     if (label_font_) {
@@ -70,8 +76,12 @@ class MorphPadView final : public CControl {
     invalid();
   }
 
-  [[nodiscard]] auto GetState() const -> const VoiceMorphState& {
+  [[nodiscard]] auto GetState() const -> const VoiceMorphState& override {
     return state_;
+  }
+
+  void SetDirectModeRequestedCallback(std::function<void()> callback) {
+    direct_mode_requested_callback_ = std::move(callback);
   }
 
   void SetShowAuxiliaryLabels(const bool show) {
@@ -320,41 +330,9 @@ class MorphPadView final : public CControl {
       ShowMarkerMenu(point, marker_index);
       return;
     }
-    ShowPadMenu(point);
-  }
-
-  void ShowPadMenu(const CPoint& point) {
-    if (state_.marker_count >= common::kMaxNVoiceMorphMarkers) {
-      return;
+    if (direct_mode_requested_callback_) {
+      direct_mode_requested_callback_();
     }
-    auto* const frame = getFrame();
-    if (!frame) {
-      return;
-    }
-
-    auto menu = VSTGUI::owned(new VSTGUI::COptionMenu());
-    menu->addEntry("Add Marker");
-    const auto frame_point = translateToGlobal(point);
-    const auto self = VSTGUI::shared(this);
-    menu->popup(
-        frame, frame_point, [self, point](VSTGUI::COptionMenu* popup) -> void {
-          if (!self->isAttached() || !popup || popup->getLastResult() < 0) {
-            return;
-          }
-          if (self->state_.marker_count >= common::kMaxNVoiceMorphMarkers) {
-            return;
-          }
-          const auto position = self->PointToNormalized(point);
-          self->beginEdit();
-          self->state_.markers[self->state_.marker_count] =
-              VoiceMorphMarker{.voice_id = self->NextVoiceId(-1, -1),
-                               .x = static_cast<float>(position.x),
-                               .y = static_cast<float>(position.y)};
-          ++self->state_.marker_count;
-          self->NotifyStateChanged();
-          self->endEdit();
-          self->invalid();
-        });
   }
 
   void ShowMarkerMenu(const CPoint& point, const int marker_index) {
@@ -512,6 +490,256 @@ class MorphPadView final : public CControl {
   VoiceMorphState state_before_edit_;
   std::vector<SharedPointer<CBitmap>> voice_bitmaps_;
   std::vector<std::string> voice_names_;
+  std::function<void()> direct_mode_requested_callback_;
+};
+
+class DirectMorphView final : public MorphStateControl {
+ public:
+  DirectMorphView(const CRect& rect, IControlListener* const listener,
+                  CFontRef font, CFontRef value_font)
+      : MorphStateControl(rect, listener, -1),
+        font_(font),
+        value_font_(value_font) {
+    font_->remember();
+    value_font_->remember();
+  }
+  ~DirectMorphView() override {
+    font_->forget();
+    value_font_->forget();
+  }
+
+  void SetVoices(std::vector<std::string> names) {
+    voice_names_ = std::move(names);
+    invalid();
+  }
+
+  void SetState(const VoiceMorphState& state) {
+    state_ = state;
+    const auto marker_weights = state_.CalculateMarkerWeights();
+    auto max_weight = 0.0f;
+    for (auto i = 0; i < state_.marker_count; ++i) {
+      max_weight = std::max(max_weight, marker_weights[i]);
+    }
+    for (auto i = 0; i < state_.marker_count; ++i) {
+      weights_[i] = max_weight > 0.0f ? marker_weights[i] / max_weight : 0.0f;
+    }
+    invalid();
+  }
+
+  [[nodiscard]] auto GetState() const -> const VoiceMorphState& override {
+    return state_;
+  }
+
+  void SetPadModeRequestedCallback(std::function<void()> callback) {
+    pad_mode_requested_callback_ = std::move(callback);
+  }
+
+  auto onMouseDown(CPoint& where, const CButtonState& buttons)
+      -> CMouseEventResult override {
+    const auto marker_index = GetMarkerIndex(where);
+    if (buttons.isRightButton()) {
+      if (marker_index < 0 && pad_mode_requested_callback_) {
+        pad_mode_requested_callback_();
+      }
+      return VSTGUI::kMouseEventHandled;
+    }
+    if (!buttons.isLeftButton()) {
+      return CView::onMouseDown(where, buttons);
+    }
+    if (marker_index < 0) {
+      return VSTGUI::kMouseEventHandled;
+    }
+    if (GetVoiceRect(marker_index).pointInside(where)) {
+      ShowVoiceMenu(where, marker_index);
+      return VSTGUI::kMouseEventHandled;
+    }
+    if (!GetSliderRect(marker_index).pointInside(where)) {
+      return VSTGUI::kMouseEventHandled;
+    }
+    editing_marker_index_ = marker_index;
+    state_before_edit_ = state_;
+    beginEdit();
+    SetWeightFromPoint(where);
+    return VSTGUI::kMouseEventHandled;
+  }
+
+  auto onMouseMoved(CPoint& where, const CButtonState& buttons)
+      -> CMouseEventResult override {
+    if (!buttons.isLeftButton() || editing_marker_index_ < 0) {
+      return CView::onMouseMoved(where, buttons);
+    }
+    SetWeightFromPoint(where);
+    return VSTGUI::kMouseEventHandled;
+  }
+
+  auto onMouseUp(CPoint&, const CButtonState&) -> CMouseEventResult override {
+    if (editing_marker_index_ >= 0) {
+      endEdit();
+    }
+    editing_marker_index_ = -1;
+    return VSTGUI::kMouseEventHandled;
+  }
+
+  auto onMouseCancel() -> CMouseEventResult override {
+    if (editing_marker_index_ >= 0) {
+      state_ = state_before_edit_;
+      NotifyStateChanged();
+      endEdit();
+    }
+    editing_marker_index_ = -1;
+    return VSTGUI::kMouseEventHandled;
+  }
+
+  void draw(CDrawContext* const context) override {
+    const auto rect = getViewSize();
+    context->saveGlobalState();
+    context->setDrawMode(kAntiAliasing);
+    context->setFillColor(CColor(0x0f, 0x0e, 0x0d));
+    context->drawRect(rect, kDrawFilled);
+    context->setFont(value_font_);
+    context->setFontColor(CColor(0xeb, 0xca, 0x89));
+    context->drawString("DIRECT WEIGHTS", CRect(18, 18, rect.right - 18, 42),
+                        CHoriTxtAlign::kLeftText, true);
+    for (auto i = 0; i < state_.marker_count; ++i) {
+      DrawMarkerRow(context, i);
+    }
+    context->restoreGlobalState();
+    setDirty(false);
+  }
+
+  CLASS_METHODS_NOCOPY(DirectMorphView, MorphStateControl)
+
+ private:
+  [[nodiscard]] auto GetMarkerIndex(const CPoint& point) const -> int {
+    for (auto i = 0; i < state_.marker_count; ++i) {
+      if (GetRowRect(i).pointInside(point)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  [[nodiscard]] auto GetRowRect(const int marker_index) const -> CRect {
+    const auto top = 82.0 + 47.0 * marker_index;
+    return CRect(18, top, getViewSize().right - 18, top + 36);
+  }
+
+  [[nodiscard]] auto GetVoiceRect(const int marker_index) const -> CRect {
+    const auto row = GetRowRect(marker_index);
+    return CRect(row.left + 34, row.top, row.left + 174, row.bottom);
+  }
+
+  [[nodiscard]] auto GetSliderRect(const int marker_index) const -> CRect {
+    const auto row = GetRowRect(marker_index);
+    return CRect(row.left + 194, row.top + 9, row.right - 58, row.bottom - 9);
+  }
+
+  void DrawMarkerRow(CDrawContext* const context, const int marker_index) {
+    const auto row = GetRowRect(marker_index);
+    const auto voice_rect = GetVoiceRect(marker_index);
+    const auto slider_rect = GetSliderRect(marker_index);
+    context->setFont(font_);
+    context->setFontColor(CColor(0xc1, 0xbe, 0xb8));
+    const auto marker_label = std::to_string(marker_index + 1);
+    context->drawString(marker_label.c_str(),
+                        CRect(row.left, row.top, row.left + 24, row.bottom),
+                        CHoriTxtAlign::kCenterText, true);
+    context->setFillColor(CColor(0x1d, 0x19, 0x14));
+    context->setFrameColor(CColor(0xeb, 0xca, 0x89, 0x70));
+    context->drawRect(voice_rect, kDrawFilledAndStroked);
+    const auto voice_id = state_.markers[marker_index].voice_id;
+    const auto voice_label =
+        voice_id >= 0 && voice_id < static_cast<int>(voice_names_.size())
+            ? voice_names_[voice_id]
+            : "Voice " + std::to_string(voice_id + 1);
+    context->setFont(value_font_);
+    context->setFontColor(CColor(0xea, 0xe4, 0xda));
+    context->drawString(voice_label.c_str(),
+                        CRect(voice_rect.left + 8, voice_rect.top,
+                              voice_rect.right - 20, voice_rect.bottom),
+                        CHoriTxtAlign::kLeftText, true);
+    context->drawString("v",
+                        CRect(voice_rect.right - 20, voice_rect.top,
+                              voice_rect.right - 4, voice_rect.bottom),
+                        CHoriTxtAlign::kCenterText, true);
+    context->setFillColor(CColor(0x2b, 0x25, 0x1c));
+    context->drawRect(slider_rect, kDrawFilled);
+    auto fill = slider_rect;
+    fill.right = fill.left + fill.getWidth() * weights_[marker_index];
+    context->setFillColor(CColor(0xc3, 0xa0, 0x66));
+    context->drawRect(fill, kDrawFilled);
+    const auto handle_x = fill.right;
+    context->setFillColor(CColor(0xeb, 0xca, 0x89));
+    context->drawEllipse(CRect(handle_x - 5, slider_rect.top - 4, handle_x + 5,
+                               slider_rect.bottom + 4),
+                         kDrawFilled);
+    const auto percent = std::to_string(static_cast<int>(
+        std::round(std::clamp(weights_[marker_index], 0.0f, 1.0f) * 100.0f)));
+    context->setFont(value_font_);
+    context->setFontColor(CColor(0xea, 0xe4, 0xda));
+    context->drawString(
+        (percent + "%").c_str(),
+        CRect(slider_rect.right + 9, row.top, row.right, row.bottom),
+        CHoriTxtAlign::kRightText, true);
+  }
+
+  void SetWeightFromPoint(const CPoint& point) {
+    const auto slider_rect = GetSliderRect(editing_marker_index_);
+    weights_[editing_marker_index_] = static_cast<float>(std::clamp(
+        (point.x - slider_rect.left) / slider_rect.getWidth(), 0.0, 1.0));
+    state_.SetMarkerWeights(weights_);
+    NotifyStateChanged();
+    invalid();
+  }
+
+  void ShowVoiceMenu(const CPoint& point, const int marker_index) {
+    auto* const frame = getFrame();
+    if (!frame || voice_names_.empty()) {
+      return;
+    }
+    auto menu = VSTGUI::owned(new VSTGUI::COptionMenu());
+    for (auto voice_id = 0; voice_id < static_cast<int>(voice_names_.size());
+         ++voice_id) {
+      auto* const item =
+          new VSTGUI::CMenuItem(voice_names_[voice_id].c_str(), voice_id);
+      item->setChecked(state_.markers[marker_index].voice_id == voice_id);
+      menu->addEntry(item);
+    }
+    const auto self = VSTGUI::shared(this);
+    menu->popup(
+        frame, translateToGlobal(point),
+        [self, marker_index](VSTGUI::COptionMenu* popup) -> void {
+          if (!self->isAttached() || !popup ||
+              marker_index >= self->state_.marker_count) {
+            return;
+          }
+          const auto selected_index = popup->getLastResult();
+          if (selected_index < 0) {
+            return;
+          }
+          auto* const item = popup->getEntry(selected_index);
+          if (!item ||
+              item->getTag() == self->state_.markers[marker_index].voice_id) {
+            return;
+          }
+          self->beginEdit();
+          self->state_.markers[marker_index].voice_id = item->getTag();
+          self->NotifyStateChanged();
+          self->endEdit();
+          self->invalid();
+        });
+  }
+
+  void NotifyStateChanged() { valueChanged(); }
+
+  CFontRef font_;
+  CFontRef value_font_;
+  int editing_marker_index_ = -1;
+  VoiceMorphState state_;
+  VoiceMorphState state_before_edit_;
+  std::array<float, common::kMaxNVoiceMorphMarkers> weights_{};
+  std::vector<std::string> voice_names_;
+  std::function<void()> pad_mode_requested_callback_;
 };
 
 class MorphFalloffSlider final : public Slider {

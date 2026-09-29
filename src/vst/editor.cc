@@ -531,6 +531,16 @@ auto PLUGIN_API Editor::open(void* const parent,
   morph_pad_view_ = morph_pad;
   morph_pad_view_->setVisible(false);
   portrait_panel->addView(morph_pad_view_);
+  auto* const direct_morph =
+      new DirectMorphView(CRect(0, 0, 480, 480), morph_pad_controller_.get(),
+                          font_small_, font_bold_);
+  direct_morph_view_ = direct_morph;
+  direct_morph_view_->setVisible(false);
+  portrait_panel->addView(direct_morph_view_);
+  morph_pad_view_->SetDirectModeRequestedCallback(
+      [this]() -> void { SetVoiceMorphDirectMode(true); });
+  direct_morph_view_->SetPadModeRequestedCallback(
+      [this]() -> void { SetVoiceMorphDirectMode(false); });
 
   portrait_description_pane_ = new DescriptionPane(
       CRect(302, 500, 782, 572), panel_surface, CColor(0xff, 0xff, 0xff, 0x0a),
@@ -694,6 +704,9 @@ void PLUGIN_API Editor::close() {
     if (morph_pad_view_ && morph_pad_view_->isEditing()) {
       morph_pad_view_->endEdit();
     }
+    if (direct_morph_view_ && direct_morph_view_->isEditing()) {
+      direct_morph_view_->endEdit();
+    }
     frame->forget();
     frame = nullptr;
     controls_.clear();
@@ -704,6 +717,7 @@ void PLUGIN_API Editor::close() {
     unloaded_logo_view_ = nullptr;
     morph_pad_controller_.reset();
     morph_pad_view_ = nullptr;
+    direct_morph_view_ = nullptr;
     portrait_description_pane_ = nullptr;
     morph_falloff_slider_ = nullptr;
     model_description_pane_ = nullptr;
@@ -716,6 +730,7 @@ void PLUGIN_API Editor::close() {
     page_tabs_ = {};
     tab_indicator_ = nullptr;
     voice_morph_state_ = {};
+    voice_morph_direct_mode_ = false;
   }
 }
 
@@ -864,8 +879,24 @@ void Editor::ApplyVoiceMorphState(const common::VoiceMorphState& state) {
   if (morph_pad_view_) {
     morph_pad_view_->SetState(voice_morph_state_);
   }
+  if (direct_morph_view_) {
+    direct_morph_view_->SetState(voice_morph_state_);
+  }
   if (morph_falloff_slider_) {
     morph_falloff_slider_->SetValue(voice_morph_state_.falloff);
+  }
+  UpdateVoiceMorphingDescription();
+}
+
+void Editor::SetVoiceMorphDirectMode(const bool direct_mode) {
+  voice_morph_direct_mode_ = direct_mode;
+  if (morph_pad_view_) {
+    morph_pad_view_->setVisible(!direct_mode);
+    morph_pad_view_->setDirty();
+  }
+  if (direct_morph_view_) {
+    direct_morph_view_->setVisible(direct_mode);
+    direct_morph_view_->setDirty();
   }
   UpdateVoiceMorphingDescription();
 }
@@ -914,6 +945,7 @@ void Editor::SyncValue(const ParamID param_id, const float plain_value) {
       portrait_view_->setVisible(false);
       unloaded_logo_view_->setVisible(true);
       morph_pad_view_->setVisible(false);
+      direct_morph_view_->setVisible(false);
       SetPortraitDescriptionMode(false);
       SetPortraitDescriptionText(u8"");
       SetVoiceDescriptionText(u8"");
@@ -925,6 +957,7 @@ void Editor::SyncValue(const ParamID param_id, const float plain_value) {
       portrait_view_->setVisible(true);
       unloaded_logo_view_->setVisible(false);
       morph_pad_view_->setVisible(false);
+      direct_morph_view_->setVisible(false);
       SetPortraitDescriptionMode(false);
       SetVoiceSelectorDisplay(voice_id);
       SetPortraitDescriptionText(
@@ -934,7 +967,7 @@ void Editor::SyncValue(const ParamID param_id, const float plain_value) {
       portrait_view_->setBackground(nullptr);
       portrait_view_->setVisible(false);
       unloaded_logo_view_->setVisible(false);
-      morph_pad_view_->setVisible(true);
+      SetVoiceMorphDirectMode(voice_morph_direct_mode_);
       SetPortraitDescriptionMode(true);
       SetPortraitDescriptionText(u8"");
       SetVoiceSelectorDisplay(-2);
@@ -1033,6 +1066,11 @@ void Editor::SyncModelDescription() {
   if (morph_pad_view_) {
     morph_pad_view_->setVisible(false);
   }
+  if (direct_morph_view_) {
+    direct_morph_view_->setVisible(false);
+    direct_morph_view_->SetVoices({});
+  }
+  voice_morph_direct_mode_ = false;
   model_config_ = std::nullopt;
   SetVoiceSelectorDisplay(-1);
   RebuildVoiceMenu();
@@ -1130,9 +1168,9 @@ void Editor::SyncModelDescription() {
       portrait_marker_thumbnails_.insert({u8"", nullptr});
     }
 
-    if (morph_pad_view_) {
-      std::vector<SharedPointer<CBitmap>> marker_bitmaps;
-      std::vector<std::string> voice_names;
+    if (morph_pad_view_ || direct_morph_view_) {
+      auto marker_bitmaps = std::vector<SharedPointer<CBitmap>>{};
+      auto voice_names = std::vector<std::string>{};
       marker_bitmaps.reserve(static_cast<size_t>(voice_count));
       voice_names.reserve(static_cast<size_t>(voice_count));
       for (auto i = 0; i < voice_count; ++i) {
@@ -1146,7 +1184,12 @@ void Editor::SyncModelDescription() {
         const auto& name = model_config_->voices[i].name;
         voice_names.emplace_back(name.begin(), name.end());
       }
-      morph_pad_view_->SetVoices(marker_bitmaps, voice_names);
+      if (morph_pad_view_) {
+        morph_pad_view_->SetVoices(std::move(marker_bitmaps), voice_names);
+      }
+      if (direct_morph_view_) {
+        direct_morph_view_->SetVoices(std::move(voice_names));
+      }
     }
 
     voice_menu->setDirty();
@@ -1321,8 +1364,9 @@ void Editor::endEdit(const Steinberg::int32 index) {
 }
 
 void Editor::UpdateVoiceMorphingDescription() {
-  if (!model_config_.has_value() || !morph_pad_view_ ||
-      !morph_pad_view_->isVisible()) {
+  if (!model_config_.has_value() ||
+      ((!morph_pad_view_ || !morph_pad_view_->isVisible()) &&
+       (!direct_morph_view_ || !direct_morph_view_->isVisible()))) {
     return;
   }
   std::u8string str;

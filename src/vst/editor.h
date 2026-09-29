@@ -28,6 +28,7 @@ static constexpr auto kWindowHeight = 720;
 
 class DescriptionPane;
 class DescriptionPopupView;
+class DirectMorphView;
 class MorphFalloffSlider;
 class MorphPadController;
 class MorphPadView;
@@ -78,6 +79,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   void HideDescriptionPopup();
   void UpdateVoiceMorphingDescription();
   void ApplyVoiceMorphState(const common::VoiceMorphState& state);
+  void SetVoiceMorphDirectMode(bool direct_mode);
   void PerformParameterEdit(ParamID param_id, ParamValue normalized_value);
   void SendParameterEdit(ParamID param_id, ParamValue normalized_value);
 
@@ -91,6 +93,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
   CView* unloaded_logo_view_ = nullptr;
   std::unique_ptr<MorphPadController> morph_pad_controller_;
   MorphPadView* morph_pad_view_ = nullptr;
+  DirectMorphView* direct_morph_view_ = nullptr;
   DescriptionPane* portrait_description_pane_ = nullptr;
   MorphFalloffSlider* morph_falloff_slider_ = nullptr;
 
@@ -118,6 +121,7 @@ class Editor : public Steinberg::Vst::VSTGUIEditor, public IControlListener {
 
   // Morphing parameters
   common::VoiceMorphState voice_morph_state_;
+  bool voice_morph_direct_mode_ = false;
 };
 
 }  // namespace beatrice::vst

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <numbers>
 
 #include "common/model_config.h"
 
@@ -45,6 +46,8 @@ struct VoiceMorphState {
       -> std::array<float, kMaxNVoiceMorphMarkers>;
   [[nodiscard]] auto CalculateWeights() const
       -> std::array<float, kMaxNSpeakers>;
+  void SetMarkerWeights(
+      const std::array<float, kMaxNVoiceMorphMarkers>& marker_weights);
 };
 
 inline auto VoiceMorphState::CalculateMarkerWeights() const
@@ -82,6 +85,45 @@ inline auto VoiceMorphState::CalculateWeights() const
     weights[voice_id] += marker_weights[i];
   }
   return weights;
+}
+
+inline void VoiceMorphState::SetMarkerWeights(
+    const std::array<float, kMaxNVoiceMorphMarkers>& marker_weights) {
+  constexpr auto kCenter = 0.5f;
+  constexpr auto kMaxRadius = 0.4f;
+  constexpr auto kEpsilon = 0.0008f;
+  cursor_x = kCenter;
+  cursor_y = kCenter;
+  if (marker_count <= 0) {
+    return;
+  }
+  if (marker_count == 1) {
+    markers[0].x = kCenter;
+    markers[0].y = kCenter;
+    return;
+  }
+
+  auto total_weight = 0.0f;
+  auto max_weight = 0.0f;
+  for (auto i = 0; i < marker_count; ++i) {
+    const auto weight = std::max(marker_weights[i], 0.0f);
+    total_weight += weight;
+    max_weight = std::max(max_weight, weight);
+  }
+  for (auto i = 0; i < marker_count; ++i) {
+    const auto angle =
+        static_cast<float>(2.0 * std::numbers::pi * i / marker_count);
+    auto radius = kMaxRadius;
+    const auto weight = std::max(marker_weights[i], 0.0f);
+    if (falloff > kVoiceMorphFalloffMin && total_weight > 0.0f &&
+        weight > 0.0f) {
+      radius = std::sqrt(
+          kEpsilon * (std::pow(max_weight / weight, 1.0f / falloff) - 1.0f));
+      radius = std::min(radius, kMaxRadius);
+    }
+    markers[i].x = kCenter + radius * std::cos(angle);
+    markers[i].y = kCenter + radius * std::sin(angle);
+  }
 }
 
 [[nodiscard]] inline auto PrepareVoiceMorphWeights(

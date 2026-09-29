@@ -29,15 +29,15 @@ void MorphPadController::valueChanged(VSTGUI::CControl* const control) {
   if (!editing_) {
     return;
   }
-  auto* const morph_pad = dynamic_cast<MorphPadView*>(control);
-  assert(morph_pad);
-  if (!morph_pad) {
+  auto* const morph_control = dynamic_cast<MorphStateControl*>(control);
+  assert(morph_control);
+  if (!morph_control) {
     return;
   }
 
   constexpr auto kEpsilon = 0.000001;
   for (const auto [param_id, value] :
-       common::GetVoiceMorphParameterValues(morph_pad->GetState())) {
+       common::GetVoiceMorphParameterValues(morph_control->GetState())) {
     const auto* const num_param = std::get_if<common::NumberParameter>(
         &common::kSchema.GetParameter(param_id));
     assert(num_param);
@@ -66,7 +66,7 @@ void MorphPadController::valueChanged(VSTGUI::CControl* const control) {
 }
 
 void MorphPadController::controlBeginEdit(VSTGUI::CControl* const control) {
-  assert(dynamic_cast<MorphPadView*>(control));
+  assert(dynamic_cast<MorphStateControl*>(control));
   assert(!editing_);
   if (editing_) {
     return;
@@ -77,7 +77,7 @@ void MorphPadController::controlBeginEdit(VSTGUI::CControl* const control) {
 }
 
 void MorphPadController::controlEndEdit(VSTGUI::CControl* const control) {
-  assert(dynamic_cast<MorphPadView*>(control));
+  assert(dynamic_cast<MorphStateControl*>(control));
   assert(editing_);
   if (!editing_) {
     return;
