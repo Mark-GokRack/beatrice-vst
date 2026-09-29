@@ -895,6 +895,9 @@ void Editor::SetVoiceMorphDirectMode(const bool direct_mode) {
     morph_pad_view_->setDirty();
   }
   if (direct_morph_view_) {
+    if (direct_mode) {
+      direct_morph_view_->SyncWeightsFromState();
+    }
     direct_morph_view_->setVisible(direct_mode);
     direct_morph_view_->setDirty();
   }

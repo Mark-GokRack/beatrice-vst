@@ -104,11 +104,14 @@ inline void VoiceMorphState::SetMarkerWeights(
   }
 
   auto total_weight = 0.0f;
-  auto max_weight = 0.0f;
+  auto min_positive_weight = 0.0f;
   for (auto i = 0; i < marker_count; ++i) {
     const auto weight = std::max(marker_weights[i], 0.0f);
     total_weight += weight;
-    max_weight = std::max(max_weight, weight);
+    if (weight > 0.0f &&
+        (min_positive_weight == 0.0f || weight < min_positive_weight)) {
+      min_positive_weight = weight;
+    }
   }
   for (auto i = 0; i < marker_count; ++i) {
     const auto angle =
@@ -117,9 +120,11 @@ inline void VoiceMorphState::SetMarkerWeights(
     const auto weight = std::max(marker_weights[i], 0.0f);
     if (falloff > kVoiceMorphFalloffMin && total_weight > 0.0f &&
         weight > 0.0f) {
-      radius = std::sqrt(
-          kEpsilon * (std::pow(max_weight / weight, 1.0f / falloff) - 1.0f));
-      radius = std::min(radius, kMaxRadius);
+      const auto scale = (kMaxRadius * kMaxRadius + kEpsilon) *
+                         std::pow(min_positive_weight, 1.0f / falloff);
+      const auto radius_squared =
+          scale * std::pow(weight, -1.0f / falloff) - kEpsilon;
+      radius = std::sqrt(std::max(radius_squared, 0.0f));
     }
     markers[i].x = kCenter + radius * std::cos(angle);
     markers[i].y = kCenter + radius * std::sin(angle);

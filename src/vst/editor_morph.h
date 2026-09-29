@@ -101,6 +101,14 @@ class MorphPadView final : public MorphStateControl {
     if (!buttons.isLeftButton()) {
       return CView::onMouseDown(where, buttons);
     }
+    if (buttons.isDoubleClick() && HitCursor(where)) {
+      beginEdit();
+      state_.SetMarkerWeights({});
+      NotifyStateChanged();
+      endEdit();
+      invalid();
+      return VSTGUI::kMouseEventHandled;
+    }
     auto move_cursor = false;
     if (HitCursor(where)) {
       drag_target_ = kCursorDragTarget;
@@ -330,9 +338,45 @@ class MorphPadView final : public MorphStateControl {
       ShowMarkerMenu(point, marker_index);
       return;
     }
-    if (direct_mode_requested_callback_) {
+    if (HitCursor(point) && direct_mode_requested_callback_) {
       direct_mode_requested_callback_();
+      return;
     }
+    ShowPadMenu(point);
+  }
+
+  void ShowPadMenu(const CPoint& point) {
+    if (state_.marker_count >= common::kMaxNVoiceMorphMarkers) {
+      return;
+    }
+    auto* const frame = getFrame();
+    if (!frame) {
+      return;
+    }
+
+    auto menu = VSTGUI::owned(new VSTGUI::COptionMenu());
+    menu->addEntry("Add Marker");
+    const auto frame_point = translateToGlobal(point);
+    const auto self = VSTGUI::shared(this);
+    menu->popup(
+        frame, frame_point, [self, point](VSTGUI::COptionMenu* popup) -> void {
+          if (!self->isAttached() || !popup || popup->getLastResult() < 0) {
+            return;
+          }
+          if (self->state_.marker_count >= common::kMaxNVoiceMorphMarkers) {
+            return;
+          }
+          const auto position = self->PointToNormalized(point);
+          self->beginEdit();
+          self->state_.markers[self->state_.marker_count] =
+              VoiceMorphMarker{.voice_id = self->NextVoiceId(-1, -1),
+                               .x = static_cast<float>(position.x),
+                               .y = static_cast<float>(position.y)};
+          ++self->state_.marker_count;
+          self->NotifyStateChanged();
+          self->endEdit();
+          self->invalid();
+        });
   }
 
   void ShowMarkerMenu(const CPoint& point, const int marker_index) {
@@ -515,6 +559,10 @@ class DirectMorphView final : public MorphStateControl {
 
   void SetState(const VoiceMorphState& state) {
     state_ = state;
+    invalid();
+  }
+
+  void SyncWeightsFromState() {
     const auto marker_weights = state_.CalculateMarkerWeights();
     auto max_weight = 0.0f;
     for (auto i = 0; i < state_.marker_count; ++i) {
