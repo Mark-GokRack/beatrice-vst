@@ -533,7 +533,7 @@ auto PLUGIN_API Editor::open(void* const parent,
   portrait_panel->addView(morph_pad_view_);
   auto* const direct_morph =
       new DirectMorphView(CRect(0, 0, 480, 480), morph_pad_controller_.get(),
-                          font_small_, font_bold_);
+                          font_bold_, font_bold_);
   direct_morph_view_ = direct_morph;
   direct_morph_view_->setVisible(false);
   portrait_panel->addView(direct_morph_view_);

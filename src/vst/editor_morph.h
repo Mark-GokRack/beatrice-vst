@@ -94,6 +94,12 @@ class MorphPadView final : public MorphStateControl {
 
   auto onMouseDown(CPoint& where, const CButtonState& buttons)
       -> CMouseEventResult override {
+    if (buttons.isLeftButton() && GetModeToggleRect().pointInside(where)) {
+      if (direct_mode_requested_callback_) {
+        direct_mode_requested_callback_();
+      }
+      return VSTGUI::kMouseEventHandled;
+    }
     if (buttons.isRightButton()) {
       HandleRightClick(where);
       return VSTGUI::kMouseEventHandled;
@@ -276,6 +282,7 @@ class MorphPadView final : public MorphStateControl {
         DrawWeightLabel(context, center, point, marker_weights[i]);
       }
     }
+    DrawModeToggle(context);
     context->restoreGlobalState();
     setDirty(false);
   }
@@ -299,6 +306,12 @@ class MorphPadView final : public MorphStateControl {
     rect.inset(0.5, 0.5);
     return {std::clamp((point.x - rect.left) / rect.getWidth(), 0.0, 1.0),
             std::clamp((point.y - rect.top) / rect.getHeight(), 0.0, 1.0)};
+  }
+
+  [[nodiscard]] auto GetModeToggleRect() const -> CRect {
+    const auto rect = getViewSize();
+    return CRect(rect.right - 94, rect.top + 10, rect.right - 10,
+                 rect.top + 34);
   }
 
   [[nodiscard]] auto HitMarker(const CPoint& point) const -> int {
@@ -338,11 +351,20 @@ class MorphPadView final : public MorphStateControl {
       ShowMarkerMenu(point, marker_index);
       return;
     }
-    if (HitCursor(point) && direct_mode_requested_callback_) {
-      direct_mode_requested_callback_();
+    if (HitCursor(point)) {
       return;
     }
     ShowPadMenu(point);
+  }
+
+  void DrawModeToggle(CDrawContext* const context) const {
+    const auto button = GetModeToggleRect();
+    context->setFillColor(CColor(0x1d, 0x19, 0x14, 0xe8));
+    context->setFrameColor(CColor(0xeb, 0xca, 0x89, 0xa8));
+    context->drawRect(button, kDrawFilledAndStroked);
+    context->setFont(label_font_);
+    context->setFontColor(CColor(0xea, 0xe4, 0xda));
+    context->drawString("DIRECT", button, CHoriTxtAlign::kCenterText, true);
   }
 
   void ShowPadMenu(const CPoint& point) {
@@ -584,11 +606,15 @@ class DirectMorphView final : public MorphStateControl {
 
   auto onMouseDown(CPoint& where, const CButtonState& buttons)
       -> CMouseEventResult override {
-    const auto marker_index = GetMarkerIndex(where);
-    if (buttons.isRightButton()) {
-      if (marker_index < 0 && pad_mode_requested_callback_) {
+    if (buttons.isLeftButton() && GetModeToggleRect().pointInside(where)) {
+      ApplyWeightsToState();
+      if (pad_mode_requested_callback_) {
         pad_mode_requested_callback_();
       }
+      return VSTGUI::kMouseEventHandled;
+    }
+    const auto marker_index = GetMarkerIndex(where);
+    if (buttons.isRightButton()) {
       return VSTGUI::kMouseEventHandled;
     }
     if (!buttons.isLeftButton()) {
@@ -648,6 +674,7 @@ class DirectMorphView final : public MorphStateControl {
     context->setFontColor(CColor(0xeb, 0xca, 0x89));
     context->drawString("DIRECT WEIGHTS", CRect(18, 18, rect.right - 18, 42),
                         CHoriTxtAlign::kLeftText, true);
+    DrawModeToggle(context);
     for (auto i = 0; i < state_.marker_count; ++i) {
       DrawMarkerRow(context, i);
     }
@@ -667,6 +694,12 @@ class DirectMorphView final : public MorphStateControl {
     return -1;
   }
 
+  [[nodiscard]] auto GetModeToggleRect() const -> CRect {
+    const auto rect = getViewSize();
+    return CRect(rect.right - 94, rect.top + 10, rect.right - 10,
+                 rect.top + 34);
+  }
+
   [[nodiscard]] auto GetRowRect(const int marker_index) const -> CRect {
     const auto top = 82.0 + 47.0 * marker_index;
     return CRect(18, top, getViewSize().right - 18, top + 36);
@@ -680,6 +713,16 @@ class DirectMorphView final : public MorphStateControl {
   [[nodiscard]] auto GetSliderRect(const int marker_index) const -> CRect {
     const auto row = GetRowRect(marker_index);
     return CRect(row.left + 194, row.top + 9, row.right - 58, row.bottom - 9);
+  }
+
+  void DrawModeToggle(CDrawContext* const context) const {
+    const auto button = GetModeToggleRect();
+    context->setFillColor(CColor(0x1d, 0x19, 0x14));
+    context->setFrameColor(CColor(0xeb, 0xca, 0x89, 0xa8));
+    context->drawRect(button, kDrawFilledAndStroked);
+    context->setFont(font_);
+    context->setFontColor(CColor(0xea, 0xe4, 0xda));
+    context->drawString("PAD", button, CHoriTxtAlign::kCenterText, true);
   }
 
   void DrawMarkerRow(CDrawContext* const context, const int marker_index) {
@@ -737,6 +780,14 @@ class DirectMorphView final : public MorphStateControl {
         (point.x - slider_rect.left) / slider_rect.getWidth(), 0.0, 1.0));
     state_.SetMarkerWeights(weights_);
     NotifyStateChanged();
+    invalid();
+  }
+
+  void ApplyWeightsToState() {
+    beginEdit();
+    state_.SetMarkerWeights(weights_);
+    NotifyStateChanged();
+    endEdit();
     invalid();
   }
 
